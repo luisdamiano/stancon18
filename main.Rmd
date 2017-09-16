@@ -53,7 +53,7 @@ cat("
 
 This case study documents the implementation in [Stan](http://mc-stan.org/) [@carpenter2016stan] of the Hidden Markov Model (HMM) for unsupervised learning [@baum1966statistical; @baum1967inequality; @baum1968growth; @baum1970maximization; @baum1972inequality]. Additionally, we present the adaptations needed for the Input-Output Hidden Markov Model (IOHMM). IOHMM is an architecture proposed by @bengio1995input to map input sequences, sometimes called the control signal, to output sequences. Compared to HMM, it aims at being especially effective at learning long term memory, that is when input-output sequences span long points. In all cases, we provide a fully Bayesian estimation of the model parameters and inference on hidden quantities, namely filtered state belief, smoothed state belief and jointly most probable state path.
 
-_A primer on Hidden Markov Models using Stan_ is licensed under CC-BY-SA 4.0. See the [LICENSE](LICENSE.md) file for details. All files are available in the [stancon18-hmm](https://github.com/luisdamiano/stancon18) GitHub repository.
+_A tutorial on Hidden Markov Models using Stan_ is licensed under CC-BY 4.0. See the [LICENSE](LICENSE.md) file for details. All files are available in the [stancon18-hmm](https://github.com/luisdamiano/stancon18) GitHub repository.
 
 ---
 
