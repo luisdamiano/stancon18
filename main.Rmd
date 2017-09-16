@@ -1,5 +1,5 @@
 ---
-title: "A primer on Hidden Markov Models using Stan"
+title: "A tutorial on Hidden Markov Models using Stan"
 author: "Luis Damiano"
 date: "`r Sys.Date()`"
 output:
@@ -53,7 +53,7 @@ cat("
 
 This case study documents the implementation in [Stan](http://mc-stan.org/) [@carpenter2016stan] of the Hidden Markov Model (HMM) for unsupervised learning [@baum1966statistical; @baum1967inequality; @baum1968growth; @baum1970maximization; @baum1972inequality]. Additionally, we present the adaptations needed for the Input-Output Hidden Markov Model (IOHMM). IOHMM is an architecture proposed by @bengio1995input to map input sequences, sometimes called the control signal, to output sequences. Compared to HMM, it aims at being especially effective at learning long term memory, that is when input-output sequences span long points. In all cases, we provide a fully Bayesian estimation of the model parameters and inference on hidden quantities, namely filtered state belief, smoothed state belief and jointly most probable state path.
 
-_A primer on Hidden Markov Models using Stan_ is licensed under CC-BY-SA 4.0. See the [LICENSE](LICENSE.md) file for details. All files are available in the [stancon18-hmm](https://github.com/luisdamiano/) GitHub repository.
+_A primer on Hidden Markov Models using Stan_ is licensed under CC-BY-SA 4.0. See the [LICENSE](LICENSE.md) file for details. All files are available in the [stancon18-hmm](https://github.com/luisdamiano/stancon18) GitHub repository.
 
 ---
 
@@ -630,7 +630,7 @@ dataset  <- hmm_generate(K, T_length)
 fit      <- hmm_fit(K, dataset$x_t)
 ```
 
-The estimates are extremely efficient as expected when dealing with generated data. The Markov Chain are well behaved as diagnosed by the low Monte Carlo standard error, the high effective sample size and the near-one shrink factor of @gelman1992inference. Although not shown, further diagnostics confirm satisfactory mixing, convergence and the inexistence of divergences. Point estimates and credibility intervals are provided by rstan's `summary` function.
+The estimates are extremely efficient as expected when dealing with generated data. The Markov Chain are well behaved as diagnosed by the low Monte Carlo standard error, the high effective sample size and the near-one shrink factor of @gelman1992inference. Although not shown, further diagnostics confirm satisfactory mixing, convergence and the absence of divergences. Point estimates and credibility intervals are provided by rstan's `summary` function.
 
 ```{r hmm_walkthrough_summary, echo = TRUE, eval = TRUE}
 knitr::kable(cbind(
@@ -833,11 +833,11 @@ Similarly, inference about the smoothed posterior marginal requires the adaptati
   & = \sum_{j = 1}^{K}{\psi_t(j) \Psi_t(i, j) \beta_{t}(j)}.
 \end{align*}
 
-Once adjusted the transition probability matrix, the Stan code for the forward-backward algorithm suffers no modification with respect to the code for the HMM.
+Once adjusted the transition probability matrix, the Stan code for the forward-backward algorithm need no further modification.
 
 ### MAP: Viterbi
 
-The Stan code for the Viterbi encoding algorithm suffers no modification with respect to the code for the HMM.
+The Stan code for the Viterbi encoding algorithm need no further modification.
 
 ## Parameter estimation
 
@@ -967,7 +967,7 @@ iohmm_fit <- function(K, u_tm, x_t) {
 fit <- iohmm_fit(K, dataset$u_tm, dataset$x_t)
 ```
 
-We rely on several diagnostic statistics and plots provided by rstan [@sdt2017rstan] and shinystan [@sdt2017shinystan] to assess mixing, convergence and the inexistence of divergences. Label switching hinders the comparison between true and observed parameters.
+We rely on several diagnostic statistics and plots provided by rstan [@sdt2017rstan] and shinystan [@sdt2017shinystan] to assess mixing, convergence and the absence of divergences. Label switching hinders the comparison between true and observed parameters.
 
 ```{r iohmm_walkthrough_summary, echo = TRUE, eval = TRUE}
 knitr::kable(cbind(

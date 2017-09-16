@@ -12,9 +12,9 @@
 
 <meta name="author" content="Luis Damiano" />
 
-<meta name="date" content="2017-09-15" />
+<meta name="date" content="2017-09-16" />
 
-<title>A primer on Hidden Markov Models using Stan</title>
+<title>A tutorial on Hidden Markov Models using Stan</title>
 
 \(
 % Math operators
@@ -84,9 +84,9 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 
 
 
-<h1 class="title toc-ignore">A primer on Hidden Markov Models using Stan</h1>
+<h1 class="title toc-ignore">A tutorial on Hidden Markov Models using Stan</h1>
 <h4 class="author"><em>Luis Damiano</em></h4>
-<h4 class="date"><em>2017-09-15</em></h4>
+<h4 class="date"><em>2017-09-16</em></h4>
 
 
 <div id="TOC">
@@ -150,7 +150,7 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
   }
   </style>
 <p>This case study documents the implementation in <a href="http://mc-stan.org/">Stan</a> <span class="citation">(Carpenter et al. 2016)</span> of the Hidden Markov Model (HMM) for unsupervised learning <span class="citation">(Baum and Petrie 1966; Baum and Eagon 1967; Baum and Sell 1968; Baum et al. 1970; Baum 1972)</span>. Additionally, we present the adaptations needed for the Input-Output Hidden Markov Model (IOHMM). IOHMM is an architecture proposed by <span class="citation">Bengio and Frasconi (1995)</span> to map input sequences, sometimes called the control signal, to output sequences. Compared to HMM, it aims at being especially effective at learning long term memory, that is when input-output sequences span long points. In all cases, we provide a fully Bayesian estimation of the model parameters and inference on hidden quantities, namely filtered state belief, smoothed state belief and jointly most probable state path.</p>
-<p><em>A primer on Hidden Markov Models using Stan</em> is licensed under CC-BY-SA 4.0. See the <a href="LICENSE.md">LICENSE</a> file for details. All files are available in the <a href="https://github.com/luisdamiano/">stancon18-hmm</a> GitHub repository.</p>
+<p><em>A primer on Hidden Markov Models using Stan</em> is licensed under CC-BY-SA 4.0. See the <a href="LICENSE.md">LICENSE</a> file for details. All files are available in the <a href="https://github.com/luisdamiano/stancon18">stancon18-hmm</a> GitHub repository.</p>
 <hr />
 <div id="the-hidden-markov-model" class="section level1">
 <h1><span class="header-section-number">1</span> The Hidden Markov Model</h1>
@@ -750,7 +750,7 @@ fit      &lt;-<span class="st"> </span><span class="kw">hmm_fit</span>(K, datase
 ##  Elapsed Time: 26.998 seconds (Warm-up)
 ##                3.613 seconds (Sampling)
 ##                30.611 seconds (Total)</code></pre>
-<p>The estimates are extremely efficient as expected when dealing with generated data. The Markov Chain are well behaved as diagnosed by the low Monte Carlo standard error, the high effective sample size and the near-one shrink factor of <span class="citation">Gelman and Rubin (1992)</span>. Although not shown, further diagnostics confirm satisfactory mixing, convergence and the inexistence of divergences. Point estimates and credibility intervals are provided by rstan’s <code>summary</code> function.</p>
+<p>The estimates are extremely efficient as expected when dealing with generated data. The Markov Chain are well behaved as diagnosed by the low Monte Carlo standard error, the high effective sample size and the near-one shrink factor of <span class="citation">Gelman and Rubin (1992)</span>. Although not shown, further diagnostics confirm satisfactory mixing, convergence and the absence of divergences. Point estimates and credibility intervals are provided by rstan’s <code>summary</code> function.</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">knitr::<span class="kw">kable</span>(<span class="kw">cbind</span>(
              <span class="kw">unlist</span>(<span class="kw">list</span>(dataset$theta$p_1k, 
                         <span class="kw">t</span>(dataset$theta$A_ij), 
@@ -1154,11 +1154,11 @@ parameters {
   &amp; \triangleq p(\mat{x}_{t:T} | z_{t-1} = i, \mat{u}_{t:T}) \\
   &amp; = \sum_{j = 1}^{K}{\psi_t(j) \Psi_t(i, j) \beta_{t}(j)}.
 \end{align*}\]</span>
-<p>Once adjusted the transition probability matrix, the Stan code for the forward-backward algorithm suffers no modification with respect to the code for the HMM.</p>
+<p>Once adjusted the transition probability matrix, the Stan code for the forward-backward algorithm need no further modification.</p>
 </div>
 <div id="map-viterbi-1" class="section level3">
 <h3><span class="header-section-number">2.2.3</span> MAP: Viterbi</h3>
-<p>The Stan code for the Viterbi encoding algorithm suffers no modification with respect to the code for the HMM.</p>
+<p>The Stan code for the Viterbi encoding algorithm need no further modification.</p>
 </div>
 </div>
 <div id="parameter-estimation-1" class="section level2">
@@ -1299,7 +1299,7 @@ fit &lt;-<span class="st"> </span><span class="kw">iohmm_fit</span>(K, dataset$u
 ##  Elapsed Time: 102.661 seconds (Warm-up)
 ##                63.233 seconds (Sampling)
 ##                165.894 seconds (Total)</code></pre>
-<p>We rely on several diagnostic statistics and plots provided by rstan <span class="citation">(Stan Development Team 2017a)</span> and shinystan <span class="citation">(Stan Development Team 2017b)</span> to assess mixing, convergence and the inexistence of divergences. Label switching hinders the comparison between true and observed parameters.</p>
+<p>We rely on several diagnostic statistics and plots provided by rstan <span class="citation">(Stan Development Team 2017a)</span> and shinystan <span class="citation">(Stan Development Team 2017b)</span> to assess mixing, convergence and the absence of divergences. Label switching hinders the comparison between true and observed parameters.</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">knitr::<span class="kw">kable</span>(<span class="kw">cbind</span>(
              <span class="kw">unlist</span>(<span class="kw">list</span>(dataset$theta$p_1k, 
                         <span class="kw">t</span>(dataset$theta$w_km), 
@@ -1789,7 +1789,7 @@ for (k in <span class="dv">1</span>:K) {
 ##  language (EN)                        
 ##  collate  Spanish_Argentina.1252      
 ##  tz       America/Buenos_Aires        
-##  date     2017-09-15</code></pre>
+##  date     2017-09-16</code></pre>
 <pre><code>## Packages -----------------------------------------------------------------</code></pre>
 <pre><code>##  package      * version   date       source        
 ##  BH             1.65.0-1  2017-08-24 CRAN (R 3.4.1)
