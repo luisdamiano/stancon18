@@ -12,9 +12,9 @@
 
 <meta name="author" content="Luis Damiano" />
 
-<meta name="date" content="2017-09-16" />
+<meta name="date" content="2017-09-15" />
 
-<title>A tutorial on Hidden Markov Models using Stan</title>
+<title>A Tutorial on Hidden Markov Models using Stan</title>
 
 \(
 % Math operators
@@ -84,9 +84,9 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 
 
 
-<h1 class="title toc-ignore">A tutorial on Hidden Markov Models using Stan</h1>
+<h1 class="title toc-ignore">A Tutorial on Hidden Markov Models using Stan</h1>
 <h4 class="author"><em>Luis Damiano</em></h4>
-<h4 class="date"><em>2017-09-16</em></h4>
+<h4 class="date"><em>2017-09-15</em></h4>
 
 
 <div id="TOC">
@@ -150,7 +150,7 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
   }
   </style>
 <p>This case study documents the implementation in <a href="http://mc-stan.org/">Stan</a> <span class="citation">(Carpenter et al. 2016)</span> of the Hidden Markov Model (HMM) for unsupervised learning <span class="citation">(Baum and Petrie 1966; Baum and Eagon 1967; Baum and Sell 1968; Baum et al. 1970; Baum 1972)</span>. Additionally, we present the adaptations needed for the Input-Output Hidden Markov Model (IOHMM). IOHMM is an architecture proposed by <span class="citation">Bengio and Frasconi (1995)</span> to map input sequences, sometimes called the control signal, to output sequences. Compared to HMM, it aims at being especially effective at learning long term memory, that is when input-output sequences span long points. In all cases, we provide a fully Bayesian estimation of the model parameters and inference on hidden quantities, namely filtered state belief, smoothed state belief and jointly most probable state path.</p>
-<p><em>A primer on Hidden Markov Models using Stan</em> is licensed under CC-BY-SA 4.0. See the <a href="LICENSE.md">LICENSE</a> file for details. All files are available in the <a href="https://github.com/luisdamiano/stancon18">stancon18-hmm</a> GitHub repository.</p>
+<p><em>A Tutorial on Hidden Markov Models using Stan</em> is licensed under CC-BY 4.0. See the <a href="LICENSE.md">LICENSE</a> file for details. All files are available in the <a href="https://github.com/luisdamiano/stancon18">stancon18</a> GitHub repository.</p>
 <hr />
 <div id="the-hidden-markov-model" class="section level1">
 <h1><span class="header-section-number">1</span> The Hidden Markov Model</h1>
@@ -1789,7 +1789,7 @@ for (k in <span class="dv">1</span>:K) {
 ##  language (EN)                        
 ##  collate  Spanish_Argentina.1252      
 ##  tz       America/Buenos_Aires        
-##  date     2017-09-16</code></pre>
+##  date     2017-10-01</code></pre>
 <pre><code>## Packages -----------------------------------------------------------------</code></pre>
 <pre><code>##  package      * version   date       source        
 ##  BH             1.65.0-1  2017-08-24 CRAN (R 3.4.1)

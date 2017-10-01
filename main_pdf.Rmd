@@ -3,17 +3,11 @@ title: "A Tutorial on Hidden Markov Models using Stan"
 author: "Luis Damiano"
 date: "2017-09-15"
 output:
-  rmarkdown::html_vignette:
+  rmarkdown::pdf_document:
     toc: true
     number_sections: true
-    self_contained: true
-    link-citations: true
     includes:
-      in_header: Rmd/preamble-html.Rmd
-vignette: >
-  %\VignetteIndexEntry{Input-Output Hidden Markov Model}
-  %\VignetteEngine{knitr::rmarkdown}
-  %\VignetteEncoding{UTF-8}
+      in_header: Rmd/preamble-pdf.Rmd
 bibliography: references.bib
 ---
 
@@ -21,34 +15,6 @@ bibliography: references.bib
 knitr::opts_chunk$set(echo = FALSE, cache = FALSE, fig.width = 9.8)
 library(rstan)
 source('R/plots.R')
-```
-
-```{r setup_html, echo = FALSE, results = "asis"}
-cat("
-  <style type=\"text/css\">
-  body { max-width: 940px !important; }
-  .main-container {
-    max-width: 940px;
-    margin-left: auto;
-    margin-right: auto;
-  }
-  code {
-    /*color: inherit;
-    background-color: rgba(0, 0, 0, 0.04);*/
-  }
-  img {
-    max-width:100%;
-    height: auto;
-    border: 0px !important;
-  }
-  .tabbed-pane {
-    padding-top: 12px;
-  }
-  button.code-folding-btn:focus {
-    outline: none;
-  }
-  </style>
-")
 ```
 
 This case study documents the implementation in [Stan](http://mc-stan.org/) [@carpenter2016stan] of the Hidden Markov Model (HMM) for unsupervised learning [@baum1966statistical; @baum1967inequality; @baum1968growth; @baum1970maximization; @baum1972inequality]. Additionally, we present the adaptations needed for the Input-Output Hidden Markov Model (IOHMM). IOHMM is an architecture proposed by @bengio1995input to map input sequences, sometimes called the control signal, to output sequences. Compared to HMM, it aims at being especially effective at learning long term memory, that is when input-output sequences span long points. In all cases, we provide a fully Bayesian estimation of the model parameters and inference on hidden quantities, namely filtered state belief, smoothed state belief and jointly most probable state path.
@@ -187,6 +153,8 @@ The density is an exponentially decaying function of $\tau$, thus longer duratio
 
 There are several quantities of interest that can be inferred via different algorithms. Our code contains the implementation of the most relevant methods for unsupervised data: forward, forward-backward and Viterbi encoding algorithms. We acknowledge the authors of the Stan Manual for the thorough illustrations and code snippets, some of which served as a starting point for our own code. As estimation is treated later, we assume that model parameters $\mat{\theta}$ are known.
 
+\scriptsize
+
 ```{r inference_table, echo = FALSE, eval = TRUE}
 df <- data.frame(
   name = c("Filtering", 
@@ -232,23 +200,12 @@ df.col <- c("Name",
             "Algorithm",
             "Complexity")
 
-knitr::kable(df, format = "html", col.names = df.col, 
+knitr::kable(df, col.names = df.col, 
              caption = "Summary of the hidden quantities and their corresponding inference algorithm.",
              table.attr = "style = 'width:100%;'")
 ```
 
-<!--
-Name            | Hidden Quantity                         | Availability at     | Algorithm | Complexity
-----------------|-----------------------------------------|---------------------|-----------|------------
-Filtering       | $p(z_t `|` \mat{x}_{1:t})$              | $t$ (online)        | Forward         |  
-Smoothing       | $p(z_t `|` \mat{x}_{1:T})$              | $T$ (offline)       | forward-backward         | $O(K^2T)$ \ $O(KT)$ if left-to-right
-Fixed lag smoothing | $p(z_{t-\ell} `|` \mat{x}_{1:t})$, $\ell>0$| $t+\ell$ (lagged)    |           |  
-State prediction| $p(z_{t+h} `|` \mat{x}_{1:t})$, $h>0$   | $t$                 |           |  
-Observation prediction | $p(x_{t+h} `|` \mat{x}_{1:t})$, $h>0$     | $t$                 |           | ?
-MAP Estimation  | $ 1+2 $                                 | $T$                 | Viterbi encoding | $O(K^2T)$ \ $O(KT)$ if sparse
-Probability of the evidence | $p(\mat{x}_{1:T})$          | $T$                 |           |  
-Table: Summary of the quantities that can be inferred and their corresponding algorithms.
--->
+\normalsize
 
 ### Filtering
 A filter infers the belief state at a given step $t$ based on all the information available up to that point $p(z_t | \mat{x}_{1:t})$. It achieves better noise reduction than simply estimating the hidden state based on the current estimate $p(z_t | \mat{x}_{t})$. The filtering process can be run online, or recursively, as new data streams in.
@@ -308,7 +265,9 @@ transformed parameters {
         for (i in 1:K) { // i = previous (t-1)
                          // Murphy (2012) p. 609 eq. 17.48
                          // belief state      + transition prob + local evidence at t
-          accumulator[i] = unalpha_tk[t-1, i] + log(A_ij[i, j]) + normal_lpdf(x_t[t] | mu_k[j], sigma_k[j]);
+          accumulator[i] = unalpha_tk[t-1, i] 
+                           + log(A_ij[i, j]) 
+                           + normal_lpdf(x_t[t] | mu_k[j], sigma_k[j]);
         }
         unalpha_tk[t, j] = log_sum_exp(accumulator);
       }
@@ -450,7 +409,9 @@ generated quantities {
         for (i in 1:K) { // i = next (t)
                          // Murphy (2012) Eq. 17.58
                          // backwards t    + transition prob + local evidence at t
-          accumulator[i] = unbeta_tk[t, i] + log(A_ij[j, i]) + normal_lpdf(x_t[t] | mu_k[i], sigma_k[i]);
+          accumulator[i] = unbeta_tk[t, i] 
+                           + log(A_ij[j, i]) 
+                           + normal_lpdf(x_t[t] | mu_k[i], sigma_k[i]);
           }
         unbeta_tk[t-1, j] = log_sum_exp(accumulator);
       }
@@ -533,7 +494,8 @@ generated quantities {
   real logp_zstar_t;
 
   { // Viterbi algorithm
-    int a_tk[T, K];       // backpointer to the most likely previous state on the most probable path
+    int a_tk[T, K];       // backpointer to the most likely previous state 
+                          // on the most probable path
     real delta_tk[T, K];  // max prob for the sequence up to t
                           // that ends with an emission from state k
 
@@ -545,7 +507,9 @@ generated quantities {
         delta_tk[t, j] = negative_infinity();
         for (i in 1:K) { // i = previous (t-1)
           real logp;
-          logp = delta_tk[t-1, i] + log(A_ij[i, j]) + normal_lpdf(x_t[t] | mu_k[j], sigma_k[j]);
+          logp = delta_tk[t-1, i] 
+                 + log(A_ij[i, j]) 
+                 + normal_lpdf(x_t[t] | mu_k[j], sigma_k[j]);
           if (logp > delta_tk[t, j]) {
             a_tk[t, j] = i;
             delta_tk[t, j] = logp;
@@ -622,7 +586,15 @@ As we expect high multimodality in the posterior density, we use a clustering al
 
 We draw one sample of length $T = 500$ from a data generating process with $K = 3$ latent states. We fit the model using the Stan code and the initialization methodology introduced previously.
 
-```{r hmm_walkthrough_estimate, echo = TRUE, eval = TRUE, cache = TRUE}
+```{r hmm_walkthrough_estimate, include = TRUE, eval = FALSE}
+set.seed(900)
+K        <- 3
+T_length <- 500
+dataset  <- hmm_generate(K, T_length)
+fit      <- hmm_fit(K, dataset$x_t)
+```
+
+```{r hmm_walkthrough_estimate_run, results = "hide", eval = TRUE, cache = TRUE}
 set.seed(900)
 K        <- 3
 T_length <- 500
@@ -632,7 +604,7 @@ fit      <- hmm_fit(K, dataset$x_t)
 
 The estimates are extremely efficient as expected when dealing with generated data. The Markov Chain are well behaved as diagnosed by the low Monte Carlo standard error, the high effective sample size and the near-one shrink factor of @gelman1992inference. Although not shown, further diagnostics confirm satisfactory mixing, convergence and the absence of divergences. Point estimates and credibility intervals are provided by rstan's `summary` function.
 
-```{r hmm_walkthrough_summary, echo = TRUE, eval = TRUE}
+```{r hmm_walkthrough_summary, include = FALSE, echo = TRUE, eval = TRUE}
 knitr::kable(cbind(
              unlist(list(dataset$theta$p_1k, 
                         t(dataset$theta$A_ij), 
@@ -647,7 +619,7 @@ knitr::kable(cbind(
 
 We extract the samples for some quantities of interest, namely the filtered probabilities vector $\mat{\alpha}_t$, the smoothed probability vector $\mat{\gamma}_t$ and the most probable hidden path $\mat{z}^*$. As an informal assessment that our software recover the hidden states correctly, we observe that the filtered probability, the smoothed probability and the most likely path are all reasonable accurate to the true values.
 
-```{r hmm_walkthrough_stateprobability, echo = TRUE, eval = TRUE, fig.height = 9, out.width="\\textwidth"}
+```{r hmm_walkthrough_stateprobability, include = TRUE, echo = FALSE, eval = TRUE, fig.height = 9, out.width="\\textwidth"}
 alpha_tk <- extract(fit, pars = 'alpha_tk')[[1]]
 gamma_tk <- extract(fit, pars = 'gamma_tk')[[1]]
 plot_stateprobability(alpha_tk, gamma_tk, 0.8, dataset$z_t)
@@ -655,27 +627,44 @@ plot_stateprobability(alpha_tk, gamma_tk, 0.8, dataset$z_t)
 
 We identify an insignificant quantity of misclassifications product of the stochastic nature of our software.
 
-```{r hmm_walkthrough_alpha, echo = TRUE, eval = TRUE}
+```{r hmm_walkthrough_alpha, include = FALSE, echo = TRUE, eval = TRUE}
 alpha_tk_med  <- apply(alpha_tk, c(2, 3), function(x) { quantile(x, c(0.50)) })
 alpha_tk_hard <- apply(alpha_tk_med, 1, which.max)
 
-table(true = dataset$z_t, estimated = alpha_tk_hard)
+# table(true = dataset$z_t, estimated = alpha_tk_hard)
+knitr::kable(
+      cbind(
+        c("$z_t = 1$", "$z_t = 2$", "$z_t = 3$"),
+        table(true = dataset$z_t, estimated = alpha_tk_hard)
+      ),
+      col.names = c("", "$\\hat{z}_t = 1$", "$\\hat{z}_t = 2$", "$\\hat{z}_t = 2$"),
+      row.names = FALSE,
+      digits = 2, align = "r", caption = "Hard classification according to the filtered probability.")
 ```
 
 As expected, the MAP estimate recovers the simulated hidden path with no label switching due because of the ordinal constraints.
 
-```{r hmm_walkthrough_statepath, echo = TRUE, eval = TRUE, fig.height = 6, out.width="\\textwidth"}
+```{r hmm_walkthrough_statepath, include = TRUE, echo = FALSE, eval = TRUE, fig.height = 6, out.width="\\textwidth"}
 zstar_t <- extract(fit, pars = 'zstar_t')[[1]]
 plot_statepath(zstar_t, dataset$z_t)
 ```
 
-```{r hmm_walkthrough_path, echo = TRUE, eval = TRUE}
-table(true = dataset$z_t, estimated = apply(zstar_t, 2, median))
+```{r hmm_walkthrough_path, include = TRUE, echo = FALSE, eval = TRUE}
+# table(true = dataset$z_t, estimated = apply(zstar_t, 2, median))
+
+knitr::kable(
+      cbind(
+        c("$z_t = 1$", "$z_t = 2$", "$z_t = 3$"),
+        table(true = dataset$z_t, estimated = apply(zstar_t, 2, median))
+      ),
+      col.names = c("", "$\\hat{z}_t = 1$", "$\\hat{z}_t = 2$", "$\\hat{z}_t = 2$"),
+      row.names = FALSE,
+      digits = 2, align = "r", caption = "Hard classification according to the Viterbi Algorithm.")
 ```
 
 Finally, we plot the observed series colored according to the jointly most likely state.
 
-```{r hmm_walkthrough_outputvit, echo = TRUE, eval = TRUE, fig.height = 6, out.width="\\textwidth"}
+```{r hmm_walkthrough_outputvit, include = TRUE, echo = FALSE, eval = TRUE, fig.height = 6, out.width="\\textwidth"}
 plot_outputvit(x = dataset$x,
                z = dataset$z_t,
                zstar = zstar_t,
@@ -797,7 +786,9 @@ transformed parameters {
         for (i in 1:K) { // i = previous (t-1)
                          // Murphy (2012) Eq. 17.48
                          // belief state + transition prob + local evidence at t
-          accumulator[i] = unalpha_tk[t-1, i] + log(A_ij[t][i]) + oblik_tk[t][j];
+          accumulator[i] = unalpha_tk[t-1, i] 
+                           + log(A_ij[t][i]) 
+                           + oblik_tk[t][j];
         }
         unalpha_tk[t, j] = log_sum_exp(accumulator);
       }
@@ -810,13 +801,11 @@ transformed parameters {
 
 A smoother infers the belief state at a given step based on all the observations or evidence,
 
-\[
 \begin{align*}
 \gamma_t(j)
   & \triangleq p(z_t = j | \mat{x}_{1:T}, \mat{u}_{1:T}) \\
   & \propto \alpha_t(j) \beta_t(j),
 \end{align*}
-\]
 
 where
 
@@ -924,18 +913,20 @@ iohmm_generate <- function(T) {
 
 We draw one sample of length $T=500$ from a data generating process with $K=3$ latent states and run an exploratory analysis of the observed quantities.
 
-```{r iohmm_walkthrough_inputoutput, echo = TRUE, eval = TRUE, fig.height = 9, out.width="\\textwidth"}
+```{r iohmm_walkthrough_simulate, include = TRUE, echo = TRUE, eval = TRUE}
 set.seed(900)
 K <- 3
 T_length <- 500
 dataset  <- iohmm_generate(T_length)
+```
 
+```{r iohmm_walkthrough_inputoutput, include = TRUE, echo = FALSE, eval = TRUE, fig.height = 9, out.width="\\textwidth"}
 plot_inputoutput(x = dataset$x_t, u = dataset$u_tm, z = dataset$z_t)
 ```
 
 We observe how the chosen values for the parameters affect the generated data. For example, the relationship between the third input $\mat{u}_3$ and the output $\mat{x}_t$ is positive, indifferent and negative for the hidden states $K = 1, 2, 3$ respectively. The true slopes are `r dataset$theta$b_km[1, 3]`, `r dataset$theta$b_km[2, 3]` and `r dataset$theta$b_km[3, 3]`.
 
-```{r iohmm_walkthrough_inputprob, echo = TRUE, eval = TRUE, fig.height = 9, out.width="\\textwidth"}
+```{r iohmm_walkthrough_inputprob, include = TRUE, echo = FALSE, eval = TRUE, fig.height = 9, out.width="\\textwidth"}
 plot_inputprob(u = dataset$u_tm, p.mat = dataset$theta$p.mat, z = dataset$z_t)
 ```
 
@@ -943,7 +934,31 @@ We then analyse the relationship between the input and the state probabilities, 
 
 We run the software to draw samples from the posterior density of model parameters and other hidden quantities.
 
-```{r iohmm_walkthrough_estimate, echo = TRUE, eval = TRUE, cache = TRUE}
+```{r iohmm_walkthrough_estimate, include = TRUE, eval = FALSE}
+iohmm_fit <- function(K, u_tm, x_t) {
+  rstan_options(auto_write = TRUE)
+  options(mc.cores = parallel::detectCores())
+  
+  stan.model = 'stan/iohmm_reg.stan'
+  stan.data = list(
+    T = nrow(u_tm),
+    K = K,
+    M = ncol(u_tm),
+    u_tm = as.array(u_tm),
+    x_t = x_t
+  )
+  
+  stan(file = stan.model,
+       data = stan.data, verbose = T,
+       iter = 400, warmup = 200,
+       thin = 1, chains = 1,
+       cores = 1, seed = 900)
+}
+
+fit <- iohmm_fit(K, dataset$u_tm, dataset$x_t)
+```
+
+```{r iohmm_walkthrough_estimate_run, results = "hide", eval = TRUE, cache = TRUE}
 iohmm_fit <- function(K, u_tm, x_t) {
   rstan_options(auto_write = TRUE)
   options(mc.cores = parallel::detectCores())
@@ -969,7 +984,7 @@ fit <- iohmm_fit(K, dataset$u_tm, dataset$x_t)
 
 We rely on several diagnostic statistics and plots provided by rstan [@sdt2017rstan] and shinystan [@sdt2017shinystan] to assess mixing, convergence and the absence of divergences. Label switching hinders the comparison between true and observed parameters.
 
-```{r iohmm_walkthrough_summary, echo = TRUE, eval = TRUE}
+```{r iohmm_walkthrough_summary, include = TRUE, echo = FALSE, eval = TRUE}
 knitr::kable(cbind(
              unlist(list(dataset$theta$p_1k, 
                         t(dataset$theta$w_km), 
@@ -984,9 +999,9 @@ knitr::kable(cbind(
 
 While mixing and convergence is extremely efficient, as expected when dealing with generated data, we note that the regression parameters for the latent states are the worst performers. The smaller effective size translates into higher Monte Carlo standard error and broader credibility intervals. One possible reason is that softmax is invariant to change in location, thus the parameters of a multinomial regression do not have a natural center and become harder to estimate.
 
-We assess that our software recover the hidden states correctly. Due to label switching, the states generated under the labels 1 through 3 were recovered in a different order. In consequence, we decide to relabel the observations based on the best fit. This would not prove to be a problem with real data as the hidden states are never observed.
+We assess that our software recover the hidden states correctly. Due to label switching, the states generated under the labels 1 through 3 were recovered in a different order. In consequence, we decide to relabel the observations based on the best fit. This would not pose an inconvenient with real data as the hidden states are never observed.
 
-```{r iohmm_walkthrough_relabeling, echo = TRUE, eval = TRUE}
+```{r iohmm_walkthrough_relabeling, include = TRUE, echo = FALSE, eval = TRUE}
 # Relabeling (ugly hack edition) -----------------------------------------
 alpha_tk <- extract(fit, pars = 'alpha_tk')[[1]]
 dataset$zrelab <- rep(0, T_length)
@@ -1003,38 +1018,60 @@ for (k in 1:K) {
   dataset$zrelab[which(dataset$z_t == k)] <- which.max(tab[, k])
 }
 
-table(new = dataset$zrelab, original = dataset$z_t)
+# table(new = dataset$zrelab, original = dataset$z_t)
+
+knitr::kable(
+      cbind(
+        c("$z^r_1$", "$z^r_2$", "$z^r_3$"),
+        table(new = dataset$zrelab, original = dataset$z_t)
+      ),
+      col.names = c("", "$z_1$", "$z_2$", "$z_3$"),
+      row.names = FALSE,
+      digits = 2, align = "r", caption = "Simulated hidden states are relabeled to match the order of the recovered states.")
 ```
 
 The filtered probability is overly accurate, as expected, making the additional information contained in the smoothed seem of little value.
 
-```{r iohmm_walkthrough_stateprobability, echo = TRUE, eval = TRUE, fig.height = 9, out.width="\\textwidth"}
+```{r iohmm_walkthrough_stateprobability, include = TRUE, echo = FALSE, eval = TRUE, fig.height = 9, out.width="\\textwidth"}
 gamma_tk <- extract(fit, pars = 'gamma_tk')[[1]]
 plot_stateprobability(alpha_tk, gamma_tk, 0.8, dataset$zrelab)
 ```
 
 The confusion matrix makes evident that, under ideal conditions, the sampler works as intended.
 
-```{r iohmm_walkthrough_filtered, echo = TRUE, eval = TRUE}
-knitr::kable(table(
-        estimated = apply(round(apply(alpha_tk, c(2, 3),
-                                      function(x) {
-                                        quantile(x, c(0.50)) })), 1, which.max),
-        real = dataset$zrelab),
-      col.names = c("Real 1", "Real 2", "Real 3"),
-      row.names = TRUE,
-      digits = 2, align = "r", caption = "Hard classification.")
+```{r iohmm_walkthrough_filtered, include = TRUE, echo = FALSE, eval = TRUE}
+knitr::kable(
+      cbind(
+        c("$z^r_t = 1$", "$z^r_t = 2$", "$z^r_t = 3$"),
+        table(
+          estimated = apply(round(apply(alpha_tk, c(2, 3),
+                                        function(x) {
+                                          quantile(x, c(0.50)) })), 1, which.max),
+          real = dataset$zrelab)
+      ),
+      col.names = c("", "$\\hat{z}_t = 1$", "$\\hat{z}_t = 2$", "$\\hat{z}_t = 2$"),
+      row.names = FALSE,
+      digits = 2, align = "r", caption = "Hard classification according to the filtered probability.")
 ```
 
 Similarly, the Viterbi algorithm recovers the expected most probably hidden state.
 
-```{r iohmm_walkthrough_statepath, echo = TRUE, eval = TRUE, fig.height = 6, out.width="\\textwidth"}
+```{r iohmm_walkthrough_statepath, include = TRUE, echo = FALSE, eval = TRUE, fig.height = 6, out.width="\\textwidth"}
 zstar_t <- extract(fit, pars = 'zstar_t')[[1]]
 plot_statepath(zstar_t, dataset$zrelab)
 ```
 
-```{r iohmm_walkthrough_path, echo = TRUE, eval = TRUE}
-table(true = dataset$z_t, estimated = apply(zstar_t, 2, median))
+```{r iohmm_walkthrough_path, include = TRUE, echo = FALSE, eval = TRUE}
+# table(true = dataset$z_t, estimated = apply(zstar_t, 2, median))
+
+knitr::kable(
+      cbind(
+        c("$z^r_t = 1$", "$z^r_t = 2$", "$z^r_t = 3$"),
+        table(true = dataset$z_t, estimated = apply(zstar_t, 2, median))
+      ),
+      col.names = c("", "$\\hat{z}_t = 1$", "$\\hat{z}_t = 2$", "$\\hat{z}_t = 2$"),
+      row.names = FALSE,
+      digits = 2, align = "r", caption = "Hard classification according to the Viterbi Algorithm.")
 ```
 
 # Acknowledgements
