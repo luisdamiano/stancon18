@@ -1,7 +1,7 @@
 ---
 title: "A Tutorial on Hidden Markov Models using Stan"
-author: "Luis Damiano"
-date: "2017-09-15"
+author: "Luis Damiano (Universidad Nacional de Rosario), Brian Peterson (University of Washington), Michael Weylandt (Rice University)"
+date: "2017-12-15"
 output:
   rmarkdown::html_vignette:
     toc: true
@@ -59,12 +59,12 @@ _A Tutorial on Hidden Markov Models using Stan_ is licensed under CC-BY 4.0. See
 
 # The Hidden Markov Model
 
-Real-world processes produce observable outputs characterized as signals. These can be discrete or continuous in nature, be pure or contaminated with noise, come from a stationary or non stationary source, among many other variations. These signals are modeled to allow for both theoretical descriptions and practical applications. The model itself can be deterministic or stochastic, in which case the signal is well characterized as a parametric random process whose parameters can be estimated in a well-defined manner.
+Real-world processes produce observable outputs characterized as signals. These can be discrete or continuous in nature, can embed uncertainty about the measurements and the explanatory model, come from a stationary or non stationary source, among many other variations. These signals are modeled to allow for both theoretical descriptions and practical applications. The model itself can be deterministic or stochastic, in which case the signal is well characterized as a parametric random process whose parameters can be estimated in a well-defined manner.
 
-Autocorrelation, a key feature in most signals, can be modeled in countless forms. While certainly pertinent to this purpose, high order Markov chains can prove inconvenient when the range of the correlation among the observations is long. A more parsimonious approach assumes that the observed sequence is a noisy observation of an underlying hidden process represented as a first-order Markov chain. In other terms, long-range dependencies between observations are mediated via latent variables. It is important to note that the Markov property is only assumed for the hidden states and not for the observations themselves.
+Autocorrelation, a key feature in most signals, can be modeled in countless forms. While certainly pertinent to this purpose, high-order Markov chains can prove inconvenient when the range of the correlation among the observations is long. A more parsimonious approach assumes that the observed sequence is a noisy observation of an underlying hidden process represented as a first-order Markov chain. In other terms, long-range dependencies between observations are mediated via latent variables. It is important to note that the Markov property is only assumed for the hidden states, and the observations are assumed conditionally independent given these latent states.
 
 ## Model specification
-HMM involves two interconnected models. The state model consists of a discrete-time, discrete-state, first order hidden Markov chain $z_t \in \{1, \dots, K\}$ that transitions according to $p(z_t | z_{t-1})$. In turns, the observation model is governed by $p(\mat{x}_t | z_t)$, where $\mat{x}_t$ are the observations, emissions or output. The corresponding joint distribution is
+HMM involve two interconnected models. The state model consists of a discrete-time, discrete-state, first-order Markov chain $z_t \in \{1, \dots, K\}$ that transitions according to $p(z_t | z_{t-1})$. In turns, the observation model is governed by $p(\mat{x}_t | z_t)$, where $\mat{x}_t$ are the observations, emissions or output [^bold_outputs]. The corresponding joint distribution is
 
 \[
 p(\mat{z}_{1:T}, \mat{x}_{1:T})
@@ -77,7 +77,7 @@ This is a specific instance of the state space model family in which the latent 
 When the output is discrete, the observation model commonly takes the form of an observation matrix
 
 \[
-p(\mat{x}_t = l | z_t = k, \mat{\theta}) = B(k, l).
+p(\mat{x}_t | z_t = k, \mat{\theta}) = \text{categorical}(\mat{x}_t | \mat{\theta}_k)
 \]
 
 Alternatively, if the output is continuous, the observation model is frequently a conditional Gaussian
@@ -95,7 +95,7 @@ The following Stan code illustrates the case of continuous observations where em
 data {
   int<lower=1> T;                   // number of observations (length)
   int<lower=1> K;                   // number of hidden states
-  real x_t[T];                      // observations
+  real y_t[T];                      // observations
 }
 
 parameters {
@@ -141,11 +141,11 @@ hmm_generate <- function(K, T) {
     z_t[t] <- sample(1:K, size = 1, prob = A_ij[z_t[t - 1], ])
 
   # 3. Observations
-  x_t <- vector("numeric", T)
+  y_t <- vector("numeric", T)
   for (t in 1:T)
-    x_t[t] <- rnorm(1, mu_k[z_t[t]], sigma_k[z_t[t]])
+    y_t[t] <- rnorm(1, mu_k[z_t[t]], sigma_k[z_t[t]])
 
-  list(x_t = x_t, z_t = z_t,
+  list(y_t = y_t, z_t = z_t,
        theta = list(p_1k = p_1k, A_ij = A_ij,
                     mu_k = mu_k, sigma_k = sigma_k))
 }
@@ -301,14 +301,14 @@ transformed parameters {
   { // Forward algorithm log p(z_t = j | x_{1:t})
     real accumulator[K];
 
-    unalpha_tk[1] = log(p_1k) + normal_lpdf(x_t[1] | mu_k, sigma_k);
+    unalpha_tk[1] = log(p_1k) + normal_lpdf(y_t[1] | mu_k, sigma_k);
 
     for (t in 2:T) {
       for (j in 1:K) { // j = current (t)
         for (i in 1:K) { // i = previous (t-1)
                          // Murphy (2012) p. 609 eq. 17.48
                          // belief state      + transition prob + local evidence at t
-          accumulator[i] = unalpha_tk[t-1, i] + log(A_ij[i, j]) + normal_lpdf(x_t[t] | mu_k[j], sigma_k[j]);
+          accumulator[i] = unalpha_tk[t-1, i] + log(A_ij[i, j]) + normal_lpdf(y_t[t] | mu_k[j], sigma_k[j]);
         }
         unalpha_tk[t, j] = log_sum_exp(accumulator);
       }
@@ -450,7 +450,7 @@ generated quantities {
         for (i in 1:K) { // i = next (t)
                          // Murphy (2012) Eq. 17.58
                          // backwards t    + transition prob + local evidence at t
-          accumulator[i] = unbeta_tk[t, i] + log(A_ij[j, i]) + normal_lpdf(x_t[t] | mu_k[i], sigma_k[i]);
+          accumulator[i] = unbeta_tk[t, i] + log(A_ij[j, i]) + normal_lpdf(y_t[t] | mu_k[i], sigma_k[i]);
           }
         unbeta_tk[t-1, j] = log_sum_exp(accumulator);
       }
@@ -538,14 +538,14 @@ generated quantities {
                           // that ends with an emission from state k
 
     for (j in 1:K)
-      delta_tk[1, K] = normal_lpdf(x_t[1] | mu_k[j], sigma_k[j]);
+      delta_tk[1, K] = normal_lpdf(y_t[1] | mu_k[j], sigma_k[j]);
 
     for (t in 2:T) {
       for (j in 1:K) { // j = current (t)
         delta_tk[t, j] = negative_infinity();
         for (i in 1:K) { // i = previous (t-1)
           real logp;
-          logp = delta_tk[t-1, i] + log(A_ij[i, j]) + normal_lpdf(x_t[t] | mu_k[j], sigma_k[j]);
+          logp = delta_tk[t-1, i] + log(A_ij[i, j]) + normal_lpdf(y_t[t] | mu_k[j], sigma_k[j]);
           if (logp > delta_tk[t, j]) {
             a_tk[t, j] = i;
             delta_tk[t, j] = logp;
@@ -584,10 +584,10 @@ A sufficient statistic captures all the information that the sample contains abo
 As illustrated in the Manual [@team2017stan, p. 353], sufficient statistics may be exploited to generate large efficiency gains: some models can be restated in an alternative, less complex way to produce a likelihood that is proportional to the expanded model.
 
 ```{r hmm_estimate, echo = TRUE, eval = TRUE, cache = TRUE}
-hmm_init <- function(K, x_t) {
-  clasif <- kmeans(x_t, K)
-  init.mu <- by(x_t, clasif$cluster, mean)
-  init.sigma <- by(x_t, clasif$cluster, sd)
+hmm_init <- function(K, y_t) {
+  clasif <- kmeans(y_t, K)
+  init.mu <- by(y_t, clasif$cluster, mean)
+  init.sigma <- by(y_t, clasif$cluster, sd)
   init.order <- order(init.mu)
 
   list(
@@ -596,15 +596,15 @@ hmm_init <- function(K, x_t) {
   )
 }
 
-hmm_fit <- function(K, x_t) {
+hmm_fit <- function(K, y_t) {
   rstan_options(auto_write = TRUE)
   options(mc.cores = parallel::detectCores())
 
   stan.model = 'stan/hmm_gaussian.stan'
   stan.data = list(
-    T = length(x_t),
+    T = length(y_t),
     K = K,
-    x_t = x_t
+    y_t = y_t
   )
 
   stan(file = stan.model,
@@ -612,7 +612,7 @@ hmm_fit <- function(K, x_t) {
        iter = 400, warmup = 200,
        thin = 1, chains = 1,
        cores = 1, seed = 900,
-       init = function(){hmm_init(K, x_t)})
+       init = function(){hmm_init(K, y_t)})
 }
 ```
 
@@ -627,7 +627,7 @@ set.seed(900)
 K        <- 3
 T_length <- 500
 dataset  <- hmm_generate(K, T_length)
-fit      <- hmm_fit(K, dataset$x_t)
+fit      <- hmm_fit(K, dataset$y_t)
 ```
 
 The estimates are extremely efficient as expected when dealing with generated data. The Markov Chain are well behaved as diagnosed by the low Monte Carlo standard error, the high effective sample size and the near-one shrink factor of @gelman1992inference. Although not shown, further diagnostics confirm satisfactory mixing, convergence and the absence of divergences. Point estimates and credibility intervals are provided by rstan's `summary` function.
@@ -727,7 +727,7 @@ data {
   int<lower=1> K;                   // number of hidden states
   int<lower=1> M;                   // size of the input vector
 
-  real x_t[T];                      // output (scalar so far)
+  real y_t[T];                      // output (scalar so far)
   vector[M] u_tm[T];                // input vectors
 }
 
@@ -781,7 +781,7 @@ transformed parameters {
   { // Evidence (observation likelihood)
     for(t in 1:T) {
       for(j in 1:K) {
-        oblik_tk[t][j] = normal_lpdf(x_t[t] | mu_k[j], s_k[j]);
+        oblik_tk[t][j] = normal_lpdf(y_t[t] | mu_k[j], s_k[j]);
       }
     }
   }
@@ -907,15 +907,15 @@ iohmm_generate <- function(T) {
   }
 
   # 3. Observations
-  x_t <- vector("numeric", T)
+  y_t <- vector("numeric", T)
   for (t in 1:T) {
-    x_t[t] <- rnorm(1, u_tm[t, ] %*% b_km[z_t[t], ], sigma_k[z_t[t]])
+    y_t[t] <- rnorm(1, u_tm[t, ] %*% b_km[z_t[t], ], sigma_k[z_t[t]])
   }
 
   list(
     u_tm = u_tm,
     z_t = z_t,
-    x_t = x_t,
+    y_t = y_t,
     theta = list(p_1k = p_1k, w_km = w_km,
                  b_km = b_km, sigma_k = sigma_k, p.mat = p.mat)
   )
@@ -930,7 +930,7 @@ K <- 3
 T_length <- 500
 dataset  <- iohmm_generate(T_length)
 
-plot_inputoutput(x = dataset$x_t, u = dataset$u_tm, z = dataset$z_t)
+plot_inputoutput(x = dataset$y_t, u = dataset$u_tm, z = dataset$z_t)
 ```
 
 We observe how the chosen values for the parameters affect the generated data. For example, the relationship between the third input $\mat{u}_3$ and the output $\mat{x}_t$ is positive, indifferent and negative for the hidden states $K = 1, 2, 3$ respectively. The true slopes are `r dataset$theta$b_km[1, 3]`, `r dataset$theta$b_km[2, 3]` and `r dataset$theta$b_km[3, 3]`.
@@ -944,7 +944,7 @@ We then analyse the relationship between the input and the state probabilities, 
 We run the software to draw samples from the posterior density of model parameters and other hidden quantities.
 
 ```{r iohmm_walkthrough_estimate, echo = TRUE, eval = TRUE, cache = TRUE}
-iohmm_fit <- function(K, u_tm, x_t) {
+iohmm_fit <- function(K, u_tm, y_t) {
   rstan_options(auto_write = TRUE)
   options(mc.cores = parallel::detectCores())
   
@@ -954,7 +954,7 @@ iohmm_fit <- function(K, u_tm, x_t) {
     K = K,
     M = ncol(u_tm),
     u_tm = as.array(u_tm),
-    x_t = x_t
+    y_t = y_t
   )
   
   stan(file = stan.model,
@@ -964,7 +964,7 @@ iohmm_fit <- function(K, u_tm, x_t) {
        cores = 1, seed = 900)
 }
 
-fit <- iohmm_fit(K, dataset$u_tm, dataset$x_t)
+fit <- iohmm_fit(K, dataset$u_tm, dataset$y_t)
 ```
 
 We rely on several diagnostic statistics and plots provided by rstan [@sdt2017rstan] and shinystan [@sdt2017shinystan] to assess mixing, convergence and the absence of divergences. Label switching hinders the comparison between true and observed parameters.
@@ -1059,3 +1059,7 @@ devtools::session_info("rstan")
 <div id="refs"></div>
 
 ---
+
+[^bold_outputs]: The output variable can be univariate or multivariate depending on the choice of model specification. While in the former case the observation at a given time index $t$ is simply a scalar $y_t$, it becomes the vector $\mat{x}_t$ in the latter. In this tutorial, we use a univariate .
+
+As we introduce new equations along with our example, which is univariate, we keep the bold notation to insist that the introduced definitions and properties are also valid in a multivariate context.
