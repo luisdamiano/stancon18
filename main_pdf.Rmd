@@ -1,18 +1,19 @@
 ---
 title: "A Tutorial on Hidden Markov Models using Stan"
-author: "Luis Damiano"
-date: "2017-09-15"
+author: "Luis Damiano (Universidad Nacional de Rosario), Brian Peterson (University of Washington), Michael Weylandt (Rice University)"
+date: "2017-12-15"
 output:
   rmarkdown::pdf_document:
+    keep_tex: true
     toc: true
     number_sections: true
     includes:
-      in_header: Rmd/pincludreamble-pdf.Rmd
+      in_header: Rmd/preamble-pdf.Rmd
 bibliography: references.bib
 ---
 
 ```{r setup, include = FALSE}
-knitr::opts_chunk$set(echo = FALSE, cache = FALSE, fig.width = 9.8)
+knitr::opts_chunk$set(echo = FALSE, cache = TRUE, fig.width = 9.8)
 library(rstan)
 source('R/plots.R')
 ```
