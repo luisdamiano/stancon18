@@ -13,7 +13,7 @@
 #' y <- rbind(y.mean - 2, y.mean, y.mean + 2)
 #' plot_intervals(x, y, cex = 0.5)
 #' @examples
-plot_intervals <- function(x, y, z_t = NULL, loess = TRUE, ...) {
+plot_intervals <- function(x, y, z = NULL, loess = TRUE, ...) {
   if (is.matrix(y) && dim(y)[1] != 3)
     stop("The observation matrix must have 3 rows.")
 
@@ -46,7 +46,7 @@ plot_intervals <- function(x, y, z_t = NULL, loess = TRUE, ...) {
     K <- length(unique(as.vector(z)))
     legend(x = "bottom",
            legend = bquote(.(paste("Hidden state", 1:K))),
-           lwd = 3, col = sort(unique(zcol)), horiz_t = TRUE, bty = 'n')
+           lwd = 3, col = sort(unique(zcol)), horiz = TRUE, bty = 'n')
   }
 }
 
@@ -68,7 +68,7 @@ plot_intervals <- function(x, y, z_t = NULL, loess = TRUE, ...) {
 #' z <- ifelse(y.mean > 0, 1, 2)
 #' plot_seqintervals(y, z, 1, cex = 0.5)
 #' @examples
-plot_seqintervals <- function(y, z_t = NULL, k = NULL, ...) {
+plot_seqintervals <- function(y, z = NULL, k = NULL, ...) {
   if (is.matrix(y) && dim(y)[1] != 3)
     stop("The observation matrix must have 3 rows.")
 
@@ -93,7 +93,7 @@ plot_seqintervals <- function(y, z_t = NULL, k = NULL, ...) {
       stop("The sequence of hidden states must be a vector of length equal to
            the number of rows in the observation matrix.")
 
-    points(x = x, y = as.numeric(z_t == k),
+    points(x = x, y = as.numeric(z == k),
        pch = 21, bg = zcol, col = zcol, cex = 0.7)
   }
 }
@@ -109,7 +109,7 @@ plot_seqintervals <- function(y, z_t = NULL, k = NULL, ...) {
 #' @export
 #'
 #' @examples plot_inputoutput(x, u, z)
-plot_inputoutput <- function(x, u, z_t = NULL, x.label = NULL, u.label = NULL) {
+plot_inputoutput <- function(x, u, z = NULL, x.label = NULL, u.label = NULL) {
   if (!is.matrix(u) || nrow(u) != length(x))
     stop("The sequence of inputs must be a matrix whose number of rows must
          equal the length of the output sequence.")
@@ -154,7 +154,7 @@ plot_inputoutput <- function(x, u, z_t = NULL, x.label = NULL, u.label = NULL) {
          legend = u.label,
          lwd = 3, lty = 1,
          col = 5 + 1:M,
-         bty = 'n', horiz_t = TRUE)
+         bty = 'n', horiz = TRUE)
 
   # 3. Output ~ Input scatterplots
   for (m in 1:M) {
@@ -185,7 +185,7 @@ plot_inputoutput <- function(x, u, z_t = NULL, x.label = NULL, u.label = NULL) {
     plot.new()
     legend(x = "center",
            legend = bquote(.(paste("Hidden state", 1:K))),
-           lwd = 3, col = sort(unique(zcol)), horiz_t = TRUE, bty = 'n')
+           lwd = 3, col = sort(unique(zcol)), horiz = TRUE, bty = 'n')
   }
   par(opar)
 }
@@ -200,7 +200,7 @@ plot_inputoutput <- function(x, u, z_t = NULL, x.label = NULL, u.label = NULL) {
 #' @export
 #'
 #' @examples plot_inputprob(u, p.mat, z)
-plot_inputprob <- function(u, p.mat, z_t = NULL, u.label = NULL) {
+plot_inputprob <- function(u, p.mat, z = NULL, u.label = NULL) {
   if (!is.matrix(u) || !is.matrix(p.mat) || dim(u)[1] != dim(p.mat)[1])
     stop("The sequence of inputs must be a matrix with same number of rows as
          the probability matrix.")
@@ -231,7 +231,7 @@ plot_inputprob <- function(u, p.mat, z_t = NULL, u.label = NULL) {
   plot.new()
   legend(x = "center",
          legend = bquote(.(paste("Hidden state", 1:K))),
-         lwd = 3, col = 1:K, horiz_t = TRUE, bty = 'n')
+         lwd = 3, col = 1:K, horiz = TRUE, bty = 'n')
   mtext("Input-State probability relationship",
         side = 3, line = -2, outer = TRUE)
   par(opar)
@@ -251,7 +251,7 @@ plot_inputprob <- function(u, p.mat, z_t = NULL, u.label = NULL) {
 #' @export
 #'
 #' @examples plot_inputprob(alpha, gamma, interval, z)
-plot_stateprobability <- function(alpha, gamma, interval = 0.8, z_t = NULL) {
+plot_stateprobability <- function(alpha, gamma, interval = 0.8, z = NULL) {
   if (any(dim(alpha) != dim(gamma)))
     stop("The arrays of filtered and smoothed probabilities must have the same
          dimension.")
@@ -279,7 +279,7 @@ plot_stateprobability <- function(alpha, gamma, interval = 0.8, z_t = NULL) {
     # 1. Filtered probability sequence (forward algoritm)
     plot_seqintervals(
       x = t, y = alpha.qs[, , k],
-      z_t = z, k = k,
+      z = z, k = k,
       xlab = bquote(t),
       ylab = bquote(p(z[t] == .(k) ~ "|" ~ x[" " ~ 1:t])),
       main = bquote("Filtered probability for Hidden State" ~ .(k))
@@ -288,7 +288,7 @@ plot_stateprobability <- function(alpha, gamma, interval = 0.8, z_t = NULL) {
     # 2. Smoothed probability sequence (forwards-backwards algorithm)
     plot_seqintervals(
       x = t, y = gamma.qs[, , k],
-      z_t = z, k = k,
+      z = z, k = k,
       xlab = bquote(t),
       ylab = bquote(p(z[t] == .(k) ~ "|" ~ x[" " ~ 1:T])),
       main = bquote("Smoothed probability for Hidden State" ~ .(k))
@@ -320,7 +320,7 @@ plot_stateprobability <- function(alpha, gamma, interval = 0.8, z_t = NULL) {
 #' @export
 #'
 #' @examples plot_statepath(zstar, z)
-plot_statepath <- function(zstar, z_t = NULL) {
+plot_statepath <- function(zstar, z = NULL) {
   K <- length(unique(as.vector(zstar)))
   t <- 1:dim(zstar)[2]
   opar <- par(no.readonly = TRUE)
@@ -362,7 +362,7 @@ plot_statepath <- function(zstar, z_t = NULL) {
          col = c('lightgray', 1:K),
          pt.bg = c('lightgray', 1:K),
          bty = 'n', cex = 0.7,
-         horiz_t = TRUE)
+         horiz = TRUE)
 
   par(opar)
 }
@@ -380,7 +380,7 @@ plot_statepath <- function(zstar, z_t = NULL) {
 #' @export
 #'
 #' @examples plot_outputfit(x, xhat, interval, z)
-plot_outputfit <- function(x, xhat, interval = 0.8, z_t = NULL, K = NULL) {
+plot_outputfit <- function(x, xhat, interval = 0.8, z = NULL, K = NULL) {
   K <- if (is.null(K)) 1 else K
   t <- 1:length(x)
   zcol <- if (is.null(z)) 1:K else z
@@ -405,7 +405,7 @@ plot_outputfit <- function(x, xhat, interval = 0.8, z_t = NULL, K = NULL) {
          legend = c(bquote("Observed"),
                     bquote(.(paste("Fit (state ", 1:K, ")", sep = '')))),
          lwd = 3, col = c("lightgray", 1:K),
-         horiz_t = TRUE, bty = 'n', cex = 0.7)
+         horiz = TRUE, bty = 'n', cex = 0.7)
 
   par(opar)
 }
@@ -478,7 +478,7 @@ plot_inputoutputprob <- function(x, u, stateprob, zstar,
          legend = u.label,
          lwd = 3, lty = 1,
          col = 5 + 1:M,
-         bty = 'n', horiz_t = TRUE)
+         bty = 'n', horiz = TRUE)
 
   # 3. State probability
   par(mar = c(0, 4.1, 0, 2.1))
@@ -520,7 +520,7 @@ plot_inputoutputprob <- function(x, u, stateprob, zstar,
          legend = paste('State ', 1:K),
          lwd = 3, col = zcol,
          bty = 'n', cex = 1,
-         horiz_t = TRUE)
+         horiz = TRUE)
 
   mtext(x.label,
         side = 3, line = -2.5, outer = TRUE)
@@ -619,7 +619,7 @@ plot_outputprob <- function(x, stateprob, zstar,
          legend = paste('State ', 1:K),
          lwd = 3, col = zcol,
          bty = 'n', cex = 1,
-         horiz_t = TRUE)
+         horiz = TRUE)
 
   mtext(x.label,
         side = 3, line = -2.5, outer = TRUE)
@@ -664,7 +664,7 @@ plot_outputvit <- function(x, z, zstar, main = NULL) {
          col = c('lightgray', 1:K, 'blue'),
          pt.bg = c('lightgray', 1:K),
          bty = 'n', cex = 0.7,
-         horiz_t = TRUE)
+         horiz = TRUE)
 
   par(opar)
 }
@@ -701,7 +701,7 @@ plot_seqforecast <- function(y, yhat, main.label = NULL, ...) {
   plot.new()
   legend(x = "center",
          legend = c("Observed", "Forecast"),
-         lwd = 3, col = c('lightgray', 1), horiz_t = TRUE, bty = 'n')
+         lwd = 3, col = c('lightgray', 1), horiz = TRUE, bty = 'n')
 
   par(opar)
 }

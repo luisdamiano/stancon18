@@ -5,6 +5,7 @@ date: "17th December, 2017"
 output:
   rmarkdown::html_vignette:
     toc: true
+    toc_depth: 2
     number_sections: true
     self_contained: true
     link-citations: true
@@ -51,7 +52,7 @@ cat("
 ")
 ```
 
-This case study documents the implementation in [Stan](http://mc-stan.org/) [@carpenter2016stan] of the Hidden Markov Model (HMM) for unsupervised learning [@baum1966statistical; @baum1967inequality; @baum1968growth; @baum1970maximization; @baum1972inequality]. Additionally, we present the adaptations needed for the Input-Output Hidden Markov Model (IOHMM). IOHMM is an architecture proposed by @bengio1995input to map input sequences, sometimes called the control signal, to output sequences. Compared to HMM, it aims at being especially effective at learning long term memory, that is when input-output sequences span long points. In all cases, we provide a fully Bayesian estimation of the model parameters and inference on hidden quantities, namely filtered and smoothed posterior distribution of the hidden states, and jointly most probable state path.
+This case study documents the implementation in [Stan](http://mc-stan.org/) [@carpenter2017stan] of the Hidden Markov Model (HMM) for unsupervised learning [@baum1966statistical; @baum1967inequality; @baum1968growth; @baum1970maximization; @baum1972inequality]. Additionally, we present the adaptations needed for the Input-Output Hidden Markov Model (IOHMM). IOHMM is an architecture proposed by @bengio1995input to map input sequences, sometimes called the control signal, to output sequences. Compared to HMM, it aims at being especially effective at learning long term memory, that is when input-output sequences span long points. In all cases, we provide a fully Bayesian estimation of the model parameters and inference on hidden quantities, namely filtered and smoothed posterior distribution of the hidden states, and jointly most probable state path.
 
 _A Tutorial on Hidden Markov Models using Stan_ is distributed under the [Creative Commons Attribution 4.0 International Public License](cc-by-v4.0.md). Accompanying code is distributed under the [GNU General Public License v3.0](gnu-gpl-v3.0.md). See the [README](README.md) file for details. All files are available in the [stancon18](https://github.com/luisdamiano/stancon18) GitHub repository.
 
@@ -59,7 +60,7 @@ _A Tutorial on Hidden Markov Models using Stan_ is distributed under the [Creati
 
 # The Hidden Markov Model
 
-Real-world processes produce observable outputs characterized as signals. These can be discrete or continuous in nature, can embed uncertainty about the measurements and the explanatory model, come from a stationary or non stationary source, among many other variations. These signals are modeled to allow for both theoretical descriptions and practical applications. The model itself can be deterministic or stochastic, in which case the signal is well characterized as a parametric random process whose parameters can be estimated in a well-defined manner.
+Real-world processes produce observable outputs characterized as signals. These can be discrete or continuous in nature, can be pure or embed uncertainty about the measurements and the explanatory model, come from a stationary or non-stationary source, among many other variations. These signals are modeled to allow for both theoretical descriptions and practical applications. The model itself can be deterministic or stochastic, in which case the signal is characterized as a parametric random process whose parameters can be estimated in a well-defined manner.
 
 Autocorrelation, a key feature in most signals, can be modeled in countless forms. While certainly pertinent to this purpose, high-order Markov chains can prove inconvenient when the range of the correlation among the observations is long. A more parsimonious approach assumes that the observed sequence is a noisy observation of an underlying hidden process represented as a first-order Markov chain. In other terms, long-range dependencies between observations are mediated via latent variables. It is important to note that the Markov property is only assumed for the hidden states, and the observations are assumed conditionally independent given these latent states.
 
@@ -87,25 +88,25 @@ p(\mat{y}_t | z_t = k, \mat{\theta}) = \mathcal{N}(\mat{y}_t | \mat{\mu}_k, \mat
 
 The latter is equivalent to a Gaussian mixture model with cluster membership ruled by Markovian dynamics, also known as Markov Switching Models (MSM). In this context, multiple sequential observations tend to share the same location until they suddenly jump into a new cluster.
 
-The non-stochastic quantities of the model are the length of the observed sequence $T$ and the number of hidden states $K$. The observed sequence $\mat{y}_t$ is a stochastic known quantity. The parameters of the models are $\mat{\theta} = (\mat{\pi}_1, \mat{\theta}_h, \mat{\theta}_o)$, where $\mat{\pi}_1$ is the initial state distribution, $\mat{\theta}_h$ are the parameters of the hidden model and $\mat{\theta}_o$ are the parameters of the state-conditional density function $p(\mat{y}_t | z_t)$. The form of $\mat{\theta}_h$ and $\mat{\theta}_o$ depends on the specification of each model. In the case under study, state transition is characterized by the $K \times K$ sized transition matrix $\mat{A} = \{a_{ij}\}$ with $a_{ij} = p(z_t = j | z_{t-1} = i)$.
+The non-stochastic quantities of the model are the length of the observed sequence $T$ and the number of hidden states $K$. The observed sequence $\mat{y}_t$ is a stochastic known quantity. The parameters of the models are $\mat{\theta} = (\mat{\pi}_1, \mat{\theta}_h, \mat{\theta}_o)$, where $\mat{\pi}_1$ is the initial state distribution, $\mat{\theta}_h$ are the parameters of the hidden model and $\mat{\theta}_o$ are the parameters of the state-conditional density function $p(\mat{y}_t | z_t)$. The form of $\mat{\theta}_h$ and $\mat{\theta}_o$ depends on the specification of each model. In the case under study, state transition is characterized by the $K \times K$ sized transition matrix with simplex rows $\mat{A} = \{a_{ij}\}$ with $a_{ij} = p(z_t = j | z_{t-1} = i)$.
 
 The following Stan code illustrates the case of continuous observations where emissions are modeled as sampled from the Gaussian distribution with parameters $\mu_k$ and $\sigma_k$ for $k \in \{1, \dots, K\}$. Adaptation for categorical observations should follow the guidelines outlined in the manual [@team2017stan, section 10.6].
 
 ```{stan stan_params, echo = TRUE, eval = FALSE, output.var = "TRASH"}
 data {
-  int<lower=1> T;                   // number of observations (length)
-  int<lower=1> K;                   // number of hidden states
+  int<lower=1> T;                 // number of observations (length)
+  int<lower=1> K;                 // number of hidden states
   real y[T];                      // observations
 }
 
 parameters {
   // Discrete state model
-  simplex[K] pi0;                  // initial state probabilities
-  simplex[K] A[K];               // transition probabilities
-                                    // A[i][j] = p(z_t = j | z_{t-1} = i)
+  simplex[K] pi1;                 // initial state probabilities
+  simplex[K] A[K];                // transition probabilities
+                                  // A[i][j] = p(z_t = j | z_{t-1} = i)
 
   // Continuous observation model
-  ordered[K] mu_k;                  // observation means
+  ordered[K] mu;                  // observation means
   real<lower=0> sigma[K];         // observation standard deviations
 }
 ```
@@ -128,7 +129,7 @@ runif_simplex <- function(T) {
 
 hmm_generate <- function(K, T) {
   # 1. Parameters
-  pi0   <- runif_simplex(K)
+  pi1   <- runif_simplex(K)
   A     <- t(replicate(K, runif_simplex(K)))
   mu    <- sort(rnorm(K, 10 * 1:K, 1))
   sigma <- abs(rnorm(K))
@@ -136,17 +137,17 @@ hmm_generate <- function(K, T) {
   # 2. Hidden path
   z <- vector("numeric", T)
 
-  z[1] <- sample(1:K, size = 1, prob = pi0)
+  z[1] <- sample(1:K, size = 1, prob = pi1)
   for (t in 2:T)
     z[t] <- sample(1:K, size = 1, prob = A[z[t - 1], ])
 
   # 3. Observations
   y <- vector("numeric", T)
   for (t in 1:T)
-    y[t] <- rnorm(1, mu_k[z[t]], sigma[z[t]])
+    y[t] <- rnorm(1, mu[z[t]], sigma[z[t]])
 
   list(y = y, z = z,
-       theta = list(pi0 = pi0, A = A,
+       theta = list(pi1 = pi1, A = A,
                     mu = mu, sigma = sigma))
 }
 ```
@@ -159,7 +160,7 @@ We set up uniform priors for $\mat{\pi}_1$ and $\mat{A}$, a weakly informative G
 
 ### Generating the hidden path
 
-The initial hidden state is drawn from a multinomial distribution with one trial and event probabilities given by the initial state probability vector $\mat{\pi}_1^{(0)}$. Given the fixed quantity $T$, the transition probabilities for each of the following steps $t \in \{2, \dots, T\}$ are generated from a multinomial distribution with one trial and event probabilities given by the $i$-th row of the transition matrix $\mat{A}_1^{(0)}$ where $i$ is the state at the previous time step $z_{t-1}^{(0)} = i$. The hidden states are subsequently sampled based on these transition probabilities.
+The initial hidden state is drawn from a multinomial distribution with one trial and event probabilities given by the initial state probability vector $\mat{\pi}_1^{(0)}$. Given the fixed quantity $T$, the transition probabilities for each of the following steps $t \in \{2, \dots, T\}$ are generated from a multinomial distribution with one trial and event probabilities given by the $i$-th row of the transition matrix $\mat{A}_1^{(0)}$, where $i$ is the state at the previous time step $z_{t-1}^{(0)} = i$. The hidden states are subsequently sampled based on these transition probabilities.
 
 ### Generating data from the sampling distribution
 
@@ -199,7 +200,7 @@ df <- data.frame(
              "$p(z_{t - \\ell} | \\mat{y}_{1:t})$, $\\ell \\ge 1$",
              "$p(z_{t+h} | \\mat{y}_{1:t})$, $h\\ge 1$",
              "$p(y_{t+h} | \\mat{y}_{1:t})$, $h\\ge 1$",
-             "$\argmax_{\\mat{z}_{1:T}} p(\\mat{z}_{1:T} | \\mat{y}_{1:T})$",
+             "$\\argmax_{\\mat{z}_{1:T}} p(\\mat{z}_{1:T} | \\mat{y}_{1:T})$",
              "$p(\\mat{y}_{1:T})$"),
   availability = c("$t$ (online)",
                    "$T$ (offline)",
@@ -210,14 +211,14 @@ df <- data.frame(
                    "$T$"),
   algorithm = c("Forward",
                 "Forward-backward",
-                "",
+                "Forward-backward",
                 "",
                 "",
                 "Viterbi decoding",
                 "Forward"),
   complexity = c("$O(K^2T)$ \\ $O(KT)$ if left-to-right",
                  "$O(K^2T)$ \\ $O(KT)$ if left-to-right",
-                 "",
+                 "$O(K^2T)$ \\ $O(KT)$ if left-to-right",
                  "",
                  "",
                  "$O(K^2T)$",
@@ -284,7 +285,7 @@ transformed parameters {
   { // Forward algorithm log p(z_t = j | y_{1:t})
     real accumulator[K];
 
-    logalpha[1] = log(pi0) + normal_lpdf(y[1] | mu, sigma);
+    logalpha[1] = log(pi1) + normal_lpdf(y[1] | mu, sigma);
 
     for (t in 2:T) {
       for (j in 1:K) { // j = current (t)
@@ -322,7 +323,7 @@ Since the unnormalized forward probability is sufficient to compute the posterio
 ### Smoothing
 A smoother infers the posterior distribution of the hidden states at a given state based on all the observations or evidence $p(z_t | \mat{y}_{1:T})$. Although noise and uncertainty are significantly reduced as a result of conditioning on past and future data, the smoothing process can only be run offline.
 
-Inference can be done by means of the forward-backward algorithm, which also plays an important role in the Baum-Welch algorithm for learning model parameters[@baum1967inequality; @baum1970maximization]. Let $\gamma_t(j)$ be the desired smoothed posterior marginal,
+Inference can be done by means of the forward-backward algorithm, which also plays an important role in the Baum-Welch algorithm for learning model parameters [@baum1967inequality; @baum1970maximization]. Let $\gamma_t(j)$ be the desired smoothed posterior marginal,
 
 \[
 \gamma_t(j)
@@ -367,7 +368,7 @@ At the last step, the base case is given by
   = p(\mat{y}_{T+1:T} | z_{T} = i) = p(\varnothing | z_t = i) = 1.
 \]
 
-Intuitively, the forward-backward algorithm passes information from left to right and then from right to left, combining them at each node. A straightforward implementation of the algorithm runs in $O(K^2 T)$ time because of the $K \times K$ matrix multiplication at each step. It is well worth noting that the forward and backward procedures, nonetheless the frequent description as two subsequent passes, are not inherently sequential and share no informations. As a result, they could be implemented in parallel.
+Intuitively, the forward-backward algorithm passes information from left to right and then from right to left, combining them at each node. A straightforward implementation of the algorithm runs in $O(K^2 T)$ time because of the $K \times K$ matrix multiplication at each step. Nonetheless the frequent description as two subsequent passes, these procedures are not inherently sequential and share no information. As a result, they could be implemented in parallel.
 
 There is a significant reduction if the transition matrix is sparse. Inference for a left-to-right (upper triangular) transition matrix, a model where the state index increases or stays the same as time passes, runs in $O(TK)$ time [@bakis1976continuous;@jelinek1976continuous]. Additional assumptions about the form of the transition matrix may ease complexity further, for example decreasing the time to $O(TK\log K)$ if $\psi(i, j) \propto \exp(-\sigma^2 |\mat{z}_i - \mat{z}_j|)$. Finally, ad-hoc data pre-processing strategies may help control complexity, for example by pruning nodes with low conditional probability of occurrence.
 
@@ -402,10 +403,10 @@ generated quantities {
       int t;
       t = T - tforward;
 
-      for (j in 1:K) { // j = previous (t-1)
-        for (i in 1:K) { // i = next (t)
-                         // Murphy (2012) Eq. 17.58
-                         // backwards t    + transition prob + local evidence at t
+      for (j in 1:K) {    // j = previous (t-1)
+        for (i in 1:K) {  // i = next (t)
+                          // Murphy (2012) Eq. 17.58
+                          // backwards t    + transition prob + local evidence at t
           accumulator[i] = logbeta[t, i] + log(A[j, i]) + normal_lpdf(y[t] | mu[i], sigma[i]);
           }
         logbeta[t-1, j] = log_sum_exp(accumulator);
@@ -429,11 +430,11 @@ generated quantities {
 
 The reader should not be deceived by the similarity to the code shown in the filtering section. Note that the indices in the log transition matrix are inverted and the evidence is now computed for the next state. We need to invert the time index as backward ranges are not available in Stan.
 
-#### Inferece recapitulation
+#### Inference recapitulation
 
-The forward-backward algorithm was designed to exploit via recursion the conditional independencies in the HMM. First, the posterior marginal probability of the latent states at a given time step is broken down into two quantities: the past and the future components. Second, each of those quantities take advantage of the Markov properties to further break the inference problem into pieces via conditioning and marginalizing, thus creating an efficient predict-update cycle.
+The forward-backward algorithm was designed to exploit via recursion the conditional independencies in the HMM. First, the posterior marginal probability of the latent states at a given time step is broken down into two quantities: the past and the future components. Second, taking advantage of the Markov properties, each of the two are further broken down into simpler pieces via conditioning and marginalizing, thus creating an efficient predict-update cycle.
 
-This strategy makes otherwise unfeasible calculations possible. Consider for example a time series with $T = 100$ observations and $K = 5$ hidden states. Summing the joint probability over all possible state sequences would involve $2 \times 100 \times 5^100 \approx 10^72$ computations, while the forward and backward pass only takes $3,000$ each. Moreover, one pass may be avoided depending on the goal of the data analysis. Summing the forward probabilities at the last time step would be enough to compute the likelihood, and the backwards recursion would be only needed if the posterior probabilities of the states were also required.
+This strategy makes otherwise unfeasible calculations possible. Consider for example a time series with $T = 100$ observations and $K = 5$ hidden states. Summing the joint probability over all possible state sequences would involve $2 \times 100 \times 5^{100} \approx 10^{72}$ computations, while the forward and backward passes only take $3,000$ each. Moreover, one pass may be avoided depending on the goal of the data analysis. Summing the forward probabilities at the last time step is enough to compute the likelihood, and the backwards recursion would be only needed if the posterior probabilities of the states were also required.
 
 ### MAP: Viterbi
 
@@ -495,9 +496,9 @@ generated quantities {
   real logp_zstar;
 
   { // Viterbi algorithm
-    int a[T, K];       // backpointer to the most likely previous state on the most probable path
-    real delta[T, K];  // max prob for the sequence up to t
-                          // that ends with an emission from state k
+    int bpointer[T, K]; // backpointer to the most likely previous state on the most probable path
+    real delta[T, K];   // max prob for the sequence up to t
+                        // that ends with an emission from state k
 
     for (j in 1:K)
       delta[1, K] = normal_lpdf(y[1] | mu[j], sigma[j]);
@@ -509,7 +510,7 @@ generated quantities {
           real logp;
           logp = delta[t-1, i] + log(A[i, j]) + normal_lpdf(y[t] | mu[j], sigma[j]);
           if (logp > delta[t, j]) {
-            a[t, j] = i;
+            bpointer[t, j] = i;
             delta[t, j] = logp;
           }
         }
@@ -523,26 +524,26 @@ generated quantities {
         zstar[T] = j;
 
     for (t in 1:(T - 1)) {
-      zstar[T - t] = a[T - t + 1, zstar[T - t + 1]];
+      zstar[T - t] = bpointer[T - t + 1, zstar[T - t + 1]];
     }
   }
 }
 ```
 
-The variable `delta` is a straightforward implementation of the corresponding equation. `a` is the traceback needed to compute the most probable sequence of states after the most probably final state `zstar` is computed.
+The variable `delta` is a straightforward implementation of the corresponding equation. `bpointer` is the traceback needed to compute the most probable sequence of states after the most probably final state `zstar` is computed.
 
 ## Parameter estimation
 
-The model likelihood can be derived from the definition of the quantity $\gamma_t(j)$: given that the sum of $\gamma_t(j)$ over all possible values of the latent variable must equal one, the log likelihood at time index $t$ becomes
+The model likelihood can be derived from the definition of the quantity $\gamma_t(j)$: given that its sum over all possible values of the latent variable must equal one, the log likelihood at time index $t$ becomes
 
 \[
 \LL_t = \sum_{i = 1}^{K}{\alpha_t(i) \beta_{t}(i)}.
 \]
 
-The last step has two convenient characteristics. First, the recurrent nature of the forward probability implies that the last iteration retains the information of all the intermediate state probabilities. Second, the base case for the backwards quantity is $\beta_{T}(i) = 1$. Consequently, the log likelihood reduces to
+The last step $T$ has two convenient characteristics. First, the recurrent nature of the forward probability implies that the last iteration retains the information of all the intermediate state probabilities. Second, the base case for the backwards quantity is $\beta_{T}(i) = 1$. Consequently, the log likelihood reduces to
 
 \[
-\LL_T \prop \sum_{i = 1}^{K}{\alpha_T(i)}.
+\LL_T \propto \sum_{i = 1}^{K}{\alpha_T(i)}.
 \]
 
 ```{stan stan_estimation, echo = TRUE, eval = FALSE, output.var = "TRASH"}
@@ -561,7 +562,7 @@ hmm_init <- function(K, y) {
   init.order <- order(init.mu)
 
   list(
-    mu_k = init.mu[init.order],
+    mu = init.mu[init.order],
     sigma = init.sigma[init.order]
   )
 }
@@ -590,7 +591,7 @@ hmm_fit <- function(K, y) {
 
 We draw one sample of length $T = 500$ from a data generating process with $K = 3$ latent states. We fit the model using the Stan code and the initialization methodology introduced previously.
 
-```{r hmm_walkthrough_estimate, echo = TRUE, eval = TRUE, cache = TRUE}
+```{r hmm_walkthrough_estimate, echo = TRUE, eval = TRUE, cache = FALSE}
 set.seed(900)
 K        <- 3
 T_length <- 500
@@ -602,12 +603,12 @@ The estimates are extremely efficient as expected when dealing with generated da
 
 ```{r hmm_walkthrough_summary, echo = TRUE, eval = TRUE}
 knitr::kable(cbind(
-             unlist(list(dataset$theta$pi0, 
+             unlist(list(dataset$theta$pi1, 
                         t(dataset$theta$A), 
                         dataset$theta$mu, 
                         dataset$theta$sigma)),
              summary(fit,
-                  pars = c('pi0', 'A', 'mu_k', 'sigma'),
+                  pars = c('pi1', 'A', 'mu', 'sigma'),
                   probs = c(0.10, 0.50, 0.90))$summary),
              col.names = c("True", "Mean", "MCSE", "SE", "$q_{10\\%}$", "$q_{50\\%}$", "$q_{90\\%}$", "ESS", "$\\hat{R}$"),
       digits = 2, align = "r", caption = "Estimated parameters and hidden quantities. *MCSE = Monte Carlo Standard Error, SE = Standard Error, ESS = Effective Sample Size*.")
@@ -616,9 +617,8 @@ knitr::kable(cbind(
 We extract the samples for some quantities of interest, namely the filtered probabilities vector $\mat{\alpha}_t$, the smoothed probability vector $\mat{\gamma}_t$ and the most probable hidden path $\mat{z}^*$. As an informal assessment that our software recover the hidden states correctly, we observe that the filtered probability, the smoothed probability and the most likely path are all reasonable accurate to the true values. As expected, the MAP estimate recovers the simulated hidden path with no label switching due because of the ordinal constraints.
 
 ```{r hmm_walkthrough_stateprobability, echo = TRUE, eval = TRUE, fig.height = 9, out.width="\\textwidth"}
-# alpha <- extract(fit, pars = 'alpha')[[1]]
-# gamma <- extract(fit, pars = 'gamma')[[1]]
-# plot_stateprobability(alpha, gamma, 0.8, dataset$z)
+alpha <- extract(fit, pars = 'alpha')[[1]]
+gamma <- extract(fit, pars = 'gamma')[[1]]
 ```
 
 ```{r hmm_walkthrough_alpha, echo = TRUE, eval = TRUE}
@@ -640,7 +640,7 @@ table(true = dataset$z, estimated = apply(zstar, 2, median))
 Finally, we plot the observed series colored according to the jointly most likely state. We identify an insignificant quantity of misclassifications product of the stochastic nature of our software.
 
 ```{r hmm_walkthrough_outputvit, echo = TRUE, eval = TRUE, fig.height = 6, out.width="\\textwidth"}
-plot_outputvit(x = dataset$x,
+plot_outputvit(x = dataset$y,
                z = dataset$z,
                zstar = zstar,
                main = "Most probable path")
@@ -665,7 +665,7 @@ The first line corresponds to the state model, which consists of discrete-time, 
 p(\mat{z}_{1:T}, \mat{y}_{1:T} | \mat{u}_{t}).
 \]
 
-In the proposed parametrization with continuous inputs and outputs, the state model involves a multinomial regression whose parameters depend on the previous state taking the value $i$,
+In the proposed parameterization with continuous inputs and outputs, the state model involves a multinomial regression whose parameters depend on the previous state taking the value $i$,
 
 \[
 p(z_t | \mat{y}_{t}, \mat{u}_{t}, z_{t-1} = i) = \text{softmax}^{-1}(\mat{u}_{t} \mat{w}_i),
@@ -683,7 +683,7 @@ As for the output sequence, the local evidence at time $t$ now becomes $\psi_t(j
 
 The actual form of the emission density $p(\mat{y}_t, \mat{\eta}_t)$ can be discrete or continuous. In case of sequence classification or symbolic mutually exclusive emissions, it is possible to set up the multinomial distribution by running the softmax function over the estimated outputs of all possible states. In this case, we approximate continuous observations with the Gaussian density, the target is estimated as a linear combination of these outputs.
 
-The adaptation of the data and parameters blocks is straightforward: we add the number of input variables `M`, the array of input vectors `u`, the regressors `b` and the residual standard deviation `s_k`.
+The adaptation of the data and parameters blocks is straightforward: we add the number of input variables `M`, the array of input vectors `u`, the regressors `b` and the residual standard deviation `sigma`.
 
 ```{stan iohmm_params, echo = TRUE, eval = FALSE, output.var = "TRASH"}
 data {
@@ -691,18 +691,18 @@ data {
   int<lower=1> K;                   // number of hidden states
   int<lower=1> M;                   // size of the input vector
 
-  real y[T];                      // output (scalar so far)
-  vector[M] u[T];                // input vectors
+  real y[T];                        // output (scalar so far)
+  vector[M] u[T];                   // input vectors
 }
 
 parameters {
   // Discrete state model
-  simplex[K] pi0;                  // initial state probabilities
-  vector[M] w[K];                // state regressors
+  simplex[K] pi1;                   // initial state probabilities
+  vector[M] w[K];                   // state regressors
 
   // Continuous observation model
-  vector[M] b[K];                // mean regressors
-  real<lower=0.0001> s_k[K];        // residual standard deviations
+  vector[M] b[K];                   // mean regressors
+  real<lower=0> sigma[K];             // residual standard deviations
 }
 ```
 
@@ -732,8 +732,8 @@ transformed parameters {
   vector[K] logoblik[T];
 
   { // Transition probability matrix p(z_t = j | z_{t-1} = i, u)
-    unA[1] = pi0; // Filler
-    A[1] = pi0; // Filler
+    unA[1] = pi1; // Filler
+    A[1] = pi1; // Filler
     for (t in 2:T) {
       for (j in 1:K) { // j = current (t)
         unA[t][j] = u[t]' * w[j];
@@ -745,7 +745,7 @@ transformed parameters {
   { // Evidence (observation likelihood)
     for(t in 1:T) {
       for(j in 1:K) {
-        logoblik[t][j] = normal_lpdf(y[t] | mu[j], s_k[j]);
+        logoblik[t][j] = normal_lpdf(y[t] | mu[j], sigma[j]);
       }
     }
   }
@@ -754,7 +754,7 @@ transformed parameters {
     real accumulator[K];
 
     for(j in 1:K)
-      logalpha[1][j] = log(pi0[j]) + logoblik[1][j];
+      logalpha[1][j] = log(pi1[j]) + logoblik[1][j];
 
     for (t in 2:T) {
       for (j in 1:K) { // j = current (t)
@@ -809,7 +809,7 @@ The parameters of the models are $\mat{\theta} = (\mat{\pi}_1, \mat{\theta}_h, \
 
 Estimation can be run under both the maximum likelihood and Bayesian frameworks. Although it is a straightforward procedure when the data is fully observed, in practice the latent states $\mat{z}_{1:T}$ are hidden. The most common approach is the application of the EM algorithm to find either the maximum likelihood or the maximum a posteriori estimates. @bengio1995input proposes a straightforward modification of the EM algorithm. The application of sigmoidal functions, for example the logistic or softmax transforms for the hidden transition model, requires numeric optimization via gradient ascent or similar methods for the M step. In this work, we exploit Stan's capabilities to produce a sampler that explores the posterior density of the model parameters.
 
-## A walk-though the IOHMM
+## A walk-though
 
 ### Numerical stability for the softmax function
 A digression! The softmax function, or normalized exponential function, can suffer from over or underflow in the exponentials. A naive implementation may fail:
@@ -819,7 +819,7 @@ x <- 10^(1:5)
 exp(x) / sum(exp(x))
 ```
 
-A well known, safer implementation exploits the fact that softmax is location invariant, ie $softmax(\mat{y}) = softmax(\mat{y} + c)$ for any constant $c$. Subtracting the maximum value produces a new vector with non-positive entries, ruling out overflows, and at least one zero element, guaranteeing at least one significant term in the denominator.
+A well-known, safer implementation exploits the fact that softmax is location invariant, ie $softmax(\mat{y}) = softmax(\mat{y} + c)$ for any constant $c$. Subtracting the maximum value produces a new vector with non-positive entries, ruling out overflows, and at least one zero element, guaranteeing at least one significant term in the denominator.
 
 ```{r softmax_stable, echo = TRUE}
 logsumexp <- function(x) {
@@ -840,7 +840,7 @@ This is already taken care in Stan [@team2017stan, p. 474].
 
 We first adapt the R routine for our new generative model. The arguments are the sequence length $T$, the number of discrete hidden states $K$, the input matrix $\mat{u}$, the initial state distribution vector $\mat{\pi}_1$, a matrix with the parameters of the multinomial regression that rules the hidden states dynamics $\mat{w}$, the name of a function drawing samples from the observation distribution and its arguments.
 
-The initial hidden state is drawn from a multinomial distribution with one trial and event probabilities given by the initial state probability vector $\mat{\pi}_1$. The transition probabilities for each of the following steps $t \in \{2, \dots, T\}$ are generated from a multinomial regression with vector parameters $\mat{w}_k$, one set per possible hidden state $k \in \{1, \dots, K\}$, and covariates $\mat{u}_t$. The hidden states are subsequently sampled based on these transition probabilities.
+The initial hidden state is drawn from a multinomial distribution with one trial and event probabilities given by the initial state probability vector $\mat{\pi}_1$. The latent states for each of the following steps $t \in \{2, \dots, T\}$ are generated from a multinomial regression with vector parameters $\mat{w}_k$, one set per possible hidden state $k \in \{1, \dots, K\}$, and covariates $\mat{u}_t$. The hidden states are subsequently sampled based on these transition probabilities.
 
 The observation at each step may generate from a Gaussian with parameters $\mu_k$ and $\sigma_k$, one set per possible hidden state.
 
@@ -857,14 +857,14 @@ iohmm_generate <- function(T) {
     c(5.0, 6.0, 7.0, 0.5, 1.0, 5.0, 0.1, -0.5, 0.1, -1.0, -5.0, 0.2),
     nrow = K, ncol = M, byrow = TRUE)
   sigma <- c(0.2, 1.0, 2.5)
-  pi0 <- c(0.4, 0.2, 0.4)
+  pi1 <- c(0.4, 0.2, 0.4)
   
   p.mat <- matrix(0, nrow = T, ncol = K)
-  p.mat[1, ] <- pi0
+  p.mat[1, ] <- pi1
 
   # 2. Hidden path
   z <- vector("numeric", T)
-  z[1] <- sample(x = 1:K, size = 1, replace = FALSE, prob = pi0)
+  z[1] <- sample(x = 1:K, size = 1, replace = FALSE, prob = pi1)
   for (t in 2:T) {
     p.mat[t, ] <- softmax(sapply(1:K, function(j) {u[t, ] %*% w[j, ]}))
     z[t] <- sample(x = 1:K, size = 1, replace = FALSE, prob = p.mat[t, ])
@@ -880,7 +880,7 @@ iohmm_generate <- function(T) {
     u = u,
     z = z,
     y = y,
-    theta = list(pi0 = pi0, w = w,
+    theta = list(pi1 = pi1, w = w,
                  b = b, sigma = sigma, p.mat = p.mat)
   )
 }
@@ -907,7 +907,7 @@ We then analyse the relationship between the input and the state probabilities, 
 
 We run the software to draw samples from the posterior density of model parameters and other hidden quantities.
 
-```{r iohmm_walkthrough_estimate, echo = TRUE, eval = TRUE, cache = TRUE}
+```{r iohmm_walkthrough_estimate, echo = TRUE, eval = TRUE, cache = FALSE}
 iohmm_fit <- function(K, u, y) {
   rstan_options(auto_write = TRUE)
   options(mc.cores = parallel::detectCores())
@@ -935,12 +935,12 @@ We rely on several diagnostic statistics and plots provided by rstan [@sdt2017rs
 
 ```{r iohmm_walkthrough_summary, echo = TRUE, eval = TRUE}
 knitr::kable(cbind(
-             unlist(list(dataset$theta$pi0, 
+             unlist(list(dataset$theta$pi1, 
                         t(dataset$theta$w), 
                         dataset$theta$b, 
                         dataset$theta$sigma)),
              summary(fit,
-                  pars = c('pi0', 'w', 'b', 'sigma'),
+                  pars = c('pi1', 'w', 'b', 'sigma'),
                   probs = c(0.10, 0.50, 0.90))$summary),
              col.names = c("True", "Mean", "MCSE", "SE", "$q_{10\\%}$", "$q_{50\\%}$", "$q_{90\\%}$", "ESS", "$\\hat{R}$"),
       digits = 2, align = "r", caption = "Estimated parameters and hidden quantities. *MCSE = Monte Carlo Standard Error, SE = Standard Error, ESS = Effective Sample Size*.")
@@ -968,13 +968,6 @@ for (k in 1:K) {
 }
 
 table(new = dataset$zrelab, original = dataset$z)
-```
-
-<!-- The filtered probability is overly accurate, as expected, making the additional information contained in the smoothed seem of little value. -->
-
-```{r iohmm_walkthrough_stateprobability, echo = TRUE, eval = TRUE, fig.height = 9, out.width="\\textwidth"}
-# gamma <- extract(fit, pars = 'gamma')[[1]]
-# plot_stateprobability(alpha, gamma, 0.8, dataset$zrelab)
 ```
 
 The confusion matrix makes evident that, under ideal conditions, the sampler works as intended.
@@ -1024,4 +1017,4 @@ devtools::session_info("rstan")
 
 ---
 
-[^bold_outputs]: The output variable can be univariate or multivariate depending on the choice of model specification. An observation at a given time index $t$ is a scalar $y_t$ and a vector $\mat{y}_t$ respectively. As we introduce definitions and properties along an example based on a univariate series, we keep the bold notation to remind that the equations are valid in a multivariate context as well.
+[^bold_outputs]: The output can be univariate or multivariate depending on the choice of model specification, in which case an observation at a given time index $t$ is a scalar $y_t$ or a vector $\mat{y}_t$ respectively. Although we introduce definitions and properties along an example based on a univariate series, we keep the bold notation to remind that the equations are valid in a multivariate context as well.

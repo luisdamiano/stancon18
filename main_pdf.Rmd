@@ -67,7 +67,7 @@ data {
 
 parameters {
   // Discrete state model
-  simplex[K] pi0;                  // initial state probabilities
+  simplex[K] pi1;                  // initial state probabilities
   simplex[K] A[K];               // transition probabilities
                                     // A[i][j] = p(z_t = j | z_{t-1} = i)
 
@@ -95,7 +95,7 @@ runif_simplex <- function(T) {
 
 hmm_generate <- function(K, T) {
   # 1. Parameters
-  pi0 <- runif_simplex(K)
+  pi1 <- runif_simplex(K)
   A <- t(replicate(K, runif_simplex(K)))
   mu_k <- sort(rnorm(K, 10 * 1:K, 1))
   sigma <- abs(rnorm(K))
@@ -103,7 +103,7 @@ hmm_generate <- function(K, T) {
   # 2. Hidden path
   z <- vector("numeric", T)
 
-  z[1] <- sample(1:K, size = 1, prob = pi0)
+  z[1] <- sample(1:K, size = 1, prob = pi1)
   for (t in 2:T)
     z[t] <- sample(1:K, size = 1, prob = A[z[t - 1], ])
 
@@ -113,7 +113,7 @@ hmm_generate <- function(K, T) {
     x_t[t] <- rnorm(1, y[z[t]], sigma[z[t]])
 
   list(x_t = x_t, z_t = z_t,
-       theta = list(pi0 = pi0, A = A,
+       theta = list(pi1 = pi1, A = A,
                     mu_k = mu, sigma = sigma))
 }
 ```
@@ -259,7 +259,7 @@ transformed parameters {
   { // Forward algorithm log p(z_t = j | x_{1:t})
     real accumulator[K];
 
-    logalpha[1] = log(pi0) + normal_lpdf(x_t[1] | mu, sigma);
+    logalpha[1] = log(pi1) + normal_lpdf(x_t[1] | mu, sigma);
 
     for (t in 2:T) {
       for (j in 1:K) { // j = current (t)
@@ -607,12 +607,12 @@ The estimates are extremely efficient as expected when dealing with generated da
 
 ```{r hmm_walkthrough_summary, include = FALSE, echo = TRUE, eval = TRUE}
 knitr::kable(cbind(
-             unlist(list(dataset$theta$pi0, 
+             unlist(list(dataset$theta$pi1, 
                         t(dataset$theta$A), 
                         dataset$theta$mu, 
                         dataset$theta$sigma)),
              summary(fit,
-                  pars = c('pi0', 'A', 'mu_k', 'sigma'),
+                  pars = c('pi1', 'A', 'mu_k', 'sigma'),
                   probs = c(0.10, 0.50, 0.90))$summary),
              col.names = c("True", "Mean", "MCSE", "SE", "$q_{10\\%}$", "$q_{50\\%}$", "$q_{90\\%}$", "ESS", "$\\hat{R}$"),
       digits = 2, align = "r", caption = "Estimated parameters and hidden quantities. *MCSE = Monte Carlo Standard Error, SE = Standard Error, ESS = Effective Sample Size*.")
@@ -709,7 +709,7 @@ As for the output sequence, the local evidence at time $t$ now becomes $\psi_t(j
 
 The actual form of the emission density $p(\mat{x}_t, \mat{\eta}_t)$ can be discrete or continuous. In case of sequence classification or symbolic mutually exclusive emissions, it is possible to set up the multinomial distribution by running the softmax function over the estimated outputs of all possible states. In this case, we approximate continuous observations with the Gaussian density, the target is estimated as a linear combination of these outputs.
 
-The adaptation of the data and parameters blocks is straightforward: we add the number of input variables `M`, the array of input vectors `u`, the regressors `b` and the residual standard deviation `s_k`.
+The adaptation of the data and parameters blocks is straightforward: we add the number of input variables `M`, the array of input vectors `u`, the regressors `b` and the residual standard deviation `sigma`.
 
 ```{stan iohmm_params, echo = TRUE, eval = FALSE, output.var = "TRASH"}
 data {
@@ -723,12 +723,12 @@ data {
 
 parameters {
   // Discrete state model
-  simplex[K] pi0;                  // initial state probabilities
+  simplex[K] pi1;                  // initial state probabilities
   vector[M] w[K];                // state regressors
 
   // Continuous observation model
   vector[M] b[K];                // mean regressors
-  real<lower=0.0001> s_k[K];        // residual standard deviations
+  real<lower=0.0001> sigma[K];        // residual standard deviations
 }
 ```
 
@@ -758,8 +758,8 @@ transformed parameters {
   vector[K] logoblik[T];
 
   { // Transition probability matrix p(z_t = j | z_{t-1} = i, u)
-    unA[1] = pi0; // Filler
-    A[1] = pi0; // Filler
+    unA[1] = pi1; // Filler
+    A[1] = pi1; // Filler
     for (t in 2:T) {
       for (j in 1:K) { // j = current (t)
         unA[t][j] = u[t]' * w[j];
@@ -771,7 +771,7 @@ transformed parameters {
   { // Evidence (observation likelihood)
     for(t in 1:T) {
       for(j in 1:K) {
-        logoblik[t][j] = normal_lpdf(x_t[t] | mu[j], s_k[j]);
+        logoblik[t][j] = normal_lpdf(x_t[t] | mu[j], sigma[j]);
       }
     }
   }
@@ -780,7 +780,7 @@ transformed parameters {
     real accumulator[K];
 
     for(j in 1:K)
-      logalpha[1][j] = log(pi0[j]) + logoblik[1][j];
+      logalpha[1][j] = log(pi1[j]) + logoblik[1][j];
 
     for (t in 2:T) {
       for (j in 1:K) { // j = current (t)
@@ -883,14 +883,14 @@ iohmm_generate <- function(T) {
     c(5.0, 6.0, 7.0, 0.5, 1.0, 5.0, 0.1, -0.5, 0.1, -1.0, -5.0, 0.2),
     nrow = K, ncol = M, byrow = TRUE)
   sigma <- c(0.2, 1.0, 2.5)
-  pi0 <- c(0.4, 0.2, 0.4)
+  pi1 <- c(0.4, 0.2, 0.4)
   
   p.mat <- matrix(0, nrow = T, ncol = K)
-  p.mat[1, ] <- pi0
+  p.mat[1, ] <- pi1
 
   # 2. Hidden path
   z <- vector("numeric", T)
-  z[1] <- sample(x = 1:K, size = 1, replace = FALSE, prob = pi0)
+  z[1] <- sample(x = 1:K, size = 1, replace = FALSE, prob = pi1)
   for (t in 2:T) {
     p.mat[t, ] <- softmax(sapply(1:K, function(j) {u[t, ] %*% w[j, ]}))
     z[t] <- sample(x = 1:K, size = 1, replace = FALSE, prob = p.mat[t, ])
@@ -906,7 +906,7 @@ iohmm_generate <- function(T) {
     u = u,
     z_t = z_t,
     x_t = x_t,
-    theta = list(pi0 = pi0, w = w,
+    theta = list(pi1 = pi1, w = w,
                  b = b, sigma = sigma, p.mat = p.mat)
   )
 }
@@ -987,12 +987,12 @@ We rely on several diagnostic statistics and plots provided by rstan [@sdt2017rs
 
 ```{r iohmm_walkthrough_summary, include = TRUE, echo = FALSE, eval = TRUE}
 knitr::kable(cbind(
-             unlist(list(dataset$theta$pi0, 
+             unlist(list(dataset$theta$pi1, 
                         t(dataset$theta$w), 
                         dataset$theta$b, 
                         dataset$theta$sigma)),
              summary(fit,
-                  pars = c('pi0', 'w', 'b', 'sigma'),
+                  pars = c('pi1', 'w', 'b', 'sigma'),
                   probs = c(0.10, 0.50, 0.90))$summary),
              col.names = c("True", "Mean", "MCSE", "SE", "$q_{10\\%}$", "$q_{50\\%}$", "$q_{90\\%}$", "ESS", "$\\hat{R}$"),
       digits = 2, align = "r", caption = "Estimated parameters and hidden quantities. *MCSE = Monte Carlo Standard Error, SE = Standard Error, ESS = Effective Sample Size*.")

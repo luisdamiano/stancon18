@@ -277,7 +277,7 @@ data {
 
 parameters {
   // Discrete state model
-  simplex[K] pi0;                  // initial state probabilities
+  simplex[K] pi1;                  // initial state probabilities
   simplex[K] A[K];               // transition probabilities
                                     // A[i][j] = p(z_t = j | z_{t-1} = i)
 
@@ -318,7 +318,7 @@ We break down the description of our code in these three steps.
 
 \NormalTok{hmm_generate <-}\StringTok{ }\NormalTok{function(K, T) \{}
   \CommentTok{# 1. Parameters}
-  \NormalTok{pi0 <-}\StringTok{ }\KeywordTok{runif_simplex}\NormalTok{(K)}
+  \NormalTok{pi1 <-}\StringTok{ }\KeywordTok{runif_simplex}\NormalTok{(K)}
   \NormalTok{A <-}\StringTok{ }\KeywordTok{t}\NormalTok{(}\KeywordTok{replicate}\NormalTok{(K, }\KeywordTok{runif_simplex}\NormalTok{(K)))}
   \NormalTok{mu_k <-}\StringTok{ }\KeywordTok{sort}\NormalTok{(}\KeywordTok{rnorm}\NormalTok{(K, }\DecValTok{10} \NormalTok{*}\StringTok{ }\DecValTok{1}\NormalTok{:K, }\DecValTok{1}\NormalTok{))}
   \NormalTok{sigma <-}\StringTok{ }\KeywordTok{abs}\NormalTok{(}\KeywordTok{rnorm}\NormalTok{(K))}
@@ -326,7 +326,7 @@ We break down the description of our code in these three steps.
   \CommentTok{# 2. Hidden path}
   \NormalTok{z <-}\StringTok{ }\KeywordTok{vector}\NormalTok{(}\StringTok{"numeric"}\NormalTok{, T)}
 
-  \NormalTok{z[}\DecValTok{1}\NormalTok{] <-}\StringTok{ }\KeywordTok{sample}\NormalTok{(}\DecValTok{1}\NormalTok{:K, }\DataTypeTok{size =} \DecValTok{1}\NormalTok{, }\DataTypeTok{prob =} \NormalTok{pi0)}
+  \NormalTok{z[}\DecValTok{1}\NormalTok{] <-}\StringTok{ }\KeywordTok{sample}\NormalTok{(}\DecValTok{1}\NormalTok{:K, }\DataTypeTok{size =} \DecValTok{1}\NormalTok{, }\DataTypeTok{prob =} \NormalTok{pi1)}
   \NormalTok{for (t in }\DecValTok{2}\NormalTok{:T)}
     \NormalTok{z[t] <-}\StringTok{ }\KeywordTok{sample}\NormalTok{(}\DecValTok{1}\NormalTok{:K, }\DataTypeTok{size =} \DecValTok{1}\NormalTok{, }\DataTypeTok{prob =} \NormalTok{A[z[t -}\StringTok{ }\DecValTok{1}\NormalTok{], ])}
 
@@ -336,7 +336,7 @@ We break down the description of our code in these three steps.
     \NormalTok{x_t[t] <-}\StringTok{ }\KeywordTok{rnorm}\NormalTok{(}\DecValTok{1}\NormalTok{, y[z[t]], sigma[z[t]])}
 
   \KeywordTok{list}\NormalTok{(}\DataTypeTok{x_t =} \NormalTok{x_t, }\DataTypeTok{z_t =} \NormalTok{z_t,}
-       \DataTypeTok{theta =} \KeywordTok{list}\NormalTok{(}\DataTypeTok{pi0 =} \NormalTok{pi0, }\DataTypeTok{A =} \NormalTok{A,}
+       \DataTypeTok{theta =} \KeywordTok{list}\NormalTok{(}\DataTypeTok{pi1 =} \NormalTok{pi1, }\DataTypeTok{A =} \NormalTok{A,}
                     \DataTypeTok{mu_k =} \NormalTok{mu, }\DataTypeTok{sigma =} \NormalTok{sigma))}
 \NormalTok{\}}
 \end{Highlighting}
@@ -527,7 +527,7 @@ transformed parameters {
   { // Forward algorithm log p(z_t = j | x_{1:t})
     real accumulator[K];
 
-    logalpha[1] = log(pi0) + normal_lpdf(x_t[1] | mu, sigma);
+    logalpha[1] = log(pi1) + normal_lpdf(x_t[1] | mu, sigma);
 
     for (t in 2:T) {
       for (j in 1:K) { // j = current (t)
@@ -1055,12 +1055,12 @@ data {
 
 parameters {
   // Discrete state model
-  simplex[K] pi0;                  // initial state probabilities
+  simplex[K] pi1;                  // initial state probabilities
   vector[M] w[K];                // state regressors
 
   // Continuous observation model
   vector[M] b[K];                // mean regressors
-  real<lower=0.0001> s_k[K];        // residual standard deviations
+  real<lower=0.0001> sigma[K];        // residual standard deviations
 }
 \end{verbatim}
 
@@ -1094,8 +1094,8 @@ transformed parameters {
   vector[K] logoblik[T];
 
   { // Transition probability matrix p(z_t = j | z_{t-1} = i, u)
-    unA[1] = pi0; // Filler
-    A[1] = pi0; // Filler
+    unA[1] = pi1; // Filler
+    A[1] = pi1; // Filler
     for (t in 2:T) {
       for (j in 1:K) { // j = current (t)
         unA[t][j] = u[t]' * w[j];
@@ -1107,7 +1107,7 @@ transformed parameters {
   { // Evidence (observation likelihood)
     for(t in 1:T) {
       for(j in 1:K) {
-        logoblik[t][j] = normal_lpdf(x_t[t] | mu[j], s_k[j]);
+        logoblik[t][j] = normal_lpdf(x_t[t] | mu[j], sigma[j]);
       }
     }
   }
@@ -1116,7 +1116,7 @@ transformed parameters {
     real accumulator[K];
 
     for(j in 1:K)
-      logalpha[1][j] = log(pi0[j]) + logoblik[1][j];
+      logalpha[1][j] = log(pi1[j]) + logoblik[1][j];
 
     for (t in 2:T) {
       for (j in 1:K) { // j = current (t)
@@ -1281,14 +1281,14 @@ state.
     \KeywordTok{c}\NormalTok{(}\FloatTok{5.0}\NormalTok{, }\FloatTok{6.0}\NormalTok{, }\FloatTok{7.0}\NormalTok{, }\FloatTok{0.5}\NormalTok{, }\FloatTok{1.0}\NormalTok{, }\FloatTok{5.0}\NormalTok{, }\FloatTok{0.1}\NormalTok{, -}\FloatTok{0.5}\NormalTok{, }\FloatTok{0.1}\NormalTok{, -}\FloatTok{1.0}\NormalTok{, -}\FloatTok{5.0}\NormalTok{, }\FloatTok{0.2}\NormalTok{),}
     \DataTypeTok{nrow =} \NormalTok{K, }\DataTypeTok{ncol =} \NormalTok{M, }\DataTypeTok{byrow =} \OtherTok{TRUE}\NormalTok{)}
   \NormalTok{sigma <-}\StringTok{ }\KeywordTok{c}\NormalTok{(}\FloatTok{0.2}\NormalTok{, }\FloatTok{1.0}\NormalTok{, }\FloatTok{2.5}\NormalTok{)}
-  \NormalTok{pi0 <-}\StringTok{ }\KeywordTok{c}\NormalTok{(}\FloatTok{0.4}\NormalTok{, }\FloatTok{0.2}\NormalTok{, }\FloatTok{0.4}\NormalTok{)}
+  \NormalTok{pi1 <-}\StringTok{ }\KeywordTok{c}\NormalTok{(}\FloatTok{0.4}\NormalTok{, }\FloatTok{0.2}\NormalTok{, }\FloatTok{0.4}\NormalTok{)}
   
   \NormalTok{p.mat <-}\StringTok{ }\KeywordTok{matrix}\NormalTok{(}\DecValTok{0}\NormalTok{, }\DataTypeTok{nrow =} \NormalTok{T, }\DataTypeTok{ncol =} \NormalTok{K)}
-  \NormalTok{p.mat[}\DecValTok{1}\NormalTok{, ] <-}\StringTok{ }\NormalTok{pi0}
+  \NormalTok{p.mat[}\DecValTok{1}\NormalTok{, ] <-}\StringTok{ }\NormalTok{pi1}
 
   \CommentTok{# 2. Hidden path}
   \NormalTok{z <-}\StringTok{ }\KeywordTok{vector}\NormalTok{(}\StringTok{"numeric"}\NormalTok{, T)}
-  \NormalTok{z[}\DecValTok{1}\NormalTok{] <-}\StringTok{ }\KeywordTok{sample}\NormalTok{(}\DataTypeTok{x =} \DecValTok{1}\NormalTok{:K, }\DataTypeTok{size =} \DecValTok{1}\NormalTok{, }\DataTypeTok{replace =} \OtherTok{FALSE}\NormalTok{, }\DataTypeTok{prob =} \NormalTok{pi0)}
+  \NormalTok{z[}\DecValTok{1}\NormalTok{] <-}\StringTok{ }\KeywordTok{sample}\NormalTok{(}\DataTypeTok{x =} \DecValTok{1}\NormalTok{:K, }\DataTypeTok{size =} \DecValTok{1}\NormalTok{, }\DataTypeTok{replace =} \OtherTok{FALSE}\NormalTok{, }\DataTypeTok{prob =} \NormalTok{pi1)}
   \NormalTok{for (t in }\DecValTok{2}\NormalTok{:T) \{}
     \NormalTok{p.mat[t, ] <-}\StringTok{ }\KeywordTok{softmax}\NormalTok{(}\KeywordTok{sapply}\NormalTok{(}\DecValTok{1}\NormalTok{:K, function(j) \{u[t, ] %*%}\StringTok{ }\NormalTok{w[j, ]\}))}
     \NormalTok{z[t] <-}\StringTok{ }\KeywordTok{sample}\NormalTok{(}\DataTypeTok{x =} \DecValTok{1}\NormalTok{:K, }\DataTypeTok{size =} \DecValTok{1}\NormalTok{, }\DataTypeTok{replace =} \OtherTok{FALSE}\NormalTok{, }\DataTypeTok{prob =} \NormalTok{p.mat[t, ])}
@@ -1304,7 +1304,7 @@ state.
     \DataTypeTok{u =} \NormalTok{u,}
     \DataTypeTok{z_t =} \NormalTok{z_t,}
     \DataTypeTok{x_t =} \NormalTok{x_t,}
-    \DataTypeTok{theta =} \KeywordTok{list}\NormalTok{(}\DataTypeTok{pi0 =} \NormalTok{pi0, }\DataTypeTok{w =} \NormalTok{w,}
+    \DataTypeTok{theta =} \KeywordTok{list}\NormalTok{(}\DataTypeTok{pi1 =} \NormalTok{pi1, }\DataTypeTok{w =} \NormalTok{w,}
                  \DataTypeTok{b =} \NormalTok{b, }\DataTypeTok{sigma =} \NormalTok{sigma, }\DataTypeTok{p.mat =} \NormalTok{p.mat)}
   \NormalTok{)}
 \NormalTok{\}}

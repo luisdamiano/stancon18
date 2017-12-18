@@ -12,12 +12,12 @@ data {
 
 parameters {
   // Discrete state model
-  simplex[K] pi0;                   // initial state probabilities
+  simplex[K] pi1;                   // initial state probabilities
   simplex[K] A[K];                  // transition probabilities
                                     // A[i][j] = p(z_t = j | z_{t-1} = i)
 
   // Continuous observation model
-  ordered[K] mu_k;                  // observation means
+  ordered[K] mu;                    // observation means
   real<lower=0> sigma[K];           // observation standard deviations
 }
 
@@ -27,7 +27,7 @@ transformed parameters {
   { // Forward algorithm log p(z_t = j | x_{1:t})
     real accumulator[K];
 
-    logalpha[1] = log(pi0) + normal_lpdf(y[1] | mu, sigma);
+    logalpha[1] = log(pi1) + normal_lpdf(y[1] | mu, sigma);
 
     for (t in 2:T) {
       for (j in 1:K) { // j = current (t)

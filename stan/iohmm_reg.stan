@@ -15,12 +15,12 @@ data {
 
 parameters {
   // Discrete state model
-  simplex[K] pi0;                   // initial state probabilities
+  simplex[K] pi1;                   // initial state probabilities
   vector[M] w[K];                   // state regressors
 
   // Continuous observation model
   vector[M] b[K];                   // mean regressors
-  real<lower=0.0001> sigma[K];      // residual standard deviations
+  real<lower=0> sigma[K];           // residual standard deviations
 }
 
 transformed parameters {
@@ -33,8 +33,8 @@ transformed parameters {
   vector[K] logoblik[T];
 
   { // Transition probability matrix p(z_t = j | z_{t-1} = i, u)
-    unA[1] = pi0;           // Filler
-    A[1] = pi0;             // Filler x2
+    unA[1] = pi1;           // Filler
+    A[1] = pi1;             // Filler x2
     logA[1] = log(A[1]);    // Filler x3
 
     for (t in 2:T) {
@@ -58,7 +58,7 @@ transformed parameters {
     real accumulator[K];
 
     for(j in 1:K)
-      logalpha[1][j] = log(pi0[j]) + logoblik[1][j];
+      logalpha[1][j] = log(pi1[j]) + logoblik[1][j];
 
     for (t in 2:T) {
       for (j in 1:K) { // j = current (t)
