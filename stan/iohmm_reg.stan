@@ -9,47 +9,47 @@ data {
   int<lower=1> K;                   // number of hidden states
   int<lower=1> M;                   // size of the input vector
 
-  real x_t[T];                      // output (scalar)
-  vector[M] u_tm[T];                 // input (vector)
+  real y[T];                        // output (scalar)
+  vector[M] u[T];                   // input (vector)
 }
 
 parameters {
   // Discrete state model
-  simplex[K] p_1k;                  // initial state probabilities
-  vector[M] w_km[K];                // state regressors
+  simplex[K] pi0;                   // initial state probabilities
+  vector[M] w[K];                   // state regressors
 
   // Continuous observation model
-  vector[M] b_km[K];                // mean regressors
-  real<lower=0.0001> sigma_k[K];        // residual standard deviations
+  vector[M] b[K];                   // mean regressors
+  real<lower=0.0001> sigma[K];      // residual standard deviations
 }
 
 transformed parameters {
-  vector[K] unalpha_tk[T];
+  vector[K] logalpha[T];
 
-  vector[K] unA_ij[T];
-  vector[K] A_ij[T];
-  vector[K] logA_ij[T];
+  vector[K] unA[T];
+  vector[K] A[T];
+  vector[K] logA[T];
 
-  vector[K] oblik_tk[T];
+  vector[K] logoblik[T];
 
-  { // Transition probability matrix p(z_t = j | z_{t-1} = i, u_tm)
-    unA_ij[1] = p_1k;           // Filler
-    A_ij[1] = p_1k;             // Filler x2
-    logA_ij[1] = log(A_ij[1]);  // Filler x3
+  { // Transition probability matrix p(z_t = j | z_{t-1} = i, u)
+    unA[1] = pi0;           // Filler
+    A[1] = pi0;             // Filler x2
+    logA[1] = log(A[1]);    // Filler x3
 
     for (t in 2:T) {
       for (j in 1:K) { // j = current (t)
-        unA_ij[t][j] = u_tm[t]' * w_km[j];
+        unA[t][j] = u[t]' * w[j];
       }
-      A_ij[t] = softmax(unA_ij[t]);
-      logA_ij[t] = log(A_ij[t]);
+      A[t] = softmax(unA[t]);
+      logA[t] = log(A[t]);
     }
   }
 
   { // Observation likelihood
     for(t in 1:T) {
       for(j in 1:K) {
-        oblik_tk[t][j] = normal_lpdf(x_t[t] | u_tm[t]'* b_km[j], sigma_k[j]);
+        logoblik[t][j] = normal_lpdf(y[t] | u[t]'* b[j], sigma[j]);
       }
     }
   }
@@ -58,16 +58,16 @@ transformed parameters {
     real accumulator[K];
 
     for(j in 1:K)
-      unalpha_tk[1][j] = log(p_1k[j]) + oblik_tk[1][j];
+      logalpha[1][j] = log(pi0[j]) + logoblik[1][j];
 
     for (t in 2:T) {
       for (j in 1:K) { // j = current (t)
         for (i in 1:K) { // i = previous (t-1)
                          // Murphy (2012) Eq. 17.48
                          // belief state + transition prob + local evidence at t
-          accumulator[i] = unalpha_tk[t-1, i] + logA_ij[t][i] + oblik_tk[t][j];
+          accumulator[i] = logalpha[t-1, i] + logA[t][i] + logoblik[t][j];
         }
-        unalpha_tk[t, j] = log_sum_exp(accumulator);
+        logalpha[t, j] = log_sum_exp(accumulator);
       }
     }
   } // Forward
@@ -75,32 +75,32 @@ transformed parameters {
 
 model {
   for(j in 1:K) {
-    w_km[j] ~ normal(0, 5);
-    b_km[j] ~ normal(0, 5);
-    sigma_k[j] ~ normal(0, 3);
+    w[j] ~ normal(0, 5);
+    b[j] ~ normal(0, 5);
+    sigma[j] ~ normal(0, 3);
   }
 
-  target += log_sum_exp(unalpha_tk[T]); // Note: update based only on last unalpha_tk
+  target += log_sum_exp(logalpha[T]); // Note: update based only on last logalpha
 }
 
 generated quantities {
-  vector[K] unbeta_tk[T];
-  vector[K] ungamma_tk[T];
+  vector[K] logbeta[T];
+  vector[K] loggamma[T];
 
-  vector[K] alpha_tk[T];
-  vector[K] beta_tk[T];
-  vector[K] gamma_tk[T];
+  vector[K] alpha[T];
+  vector[K] beta[T];
+  vector[K] gamma[T];
 
-  vector[K] hatpi_tk[T];
-  int<lower=1, upper=K> hatz_t[T];
-  real hatx_t[T];
+  vector[K] hatpi[T];
+  int<lower=1, upper=K> hatz[T];
+  real haty[T];
 
-  int<lower=1, upper=K> zstar_t[T];
+  int<lower=1, upper=K> zstar[T];
   real logp_zstar;
 
   { // Forward algorithm log p(z_t = j | x_{1:t})
     for (t in 1:T)
-      alpha_tk[t] = softmax(unalpha_tk[t]);
+      alpha[t] = softmax(logalpha[t]);
   } // Forward
 
   { // Backward algorithm log p(x_{t+1:T} | z_t = j)
@@ -108,7 +108,7 @@ generated quantities {
     int tbackwards;
 
     for (j in 1:K)
-      unbeta_tk[T, j] = 1;
+      logbeta[T, j] = 1;
 
     for (tforwards in 0:(T-2)) {
       tbackwards = T - tforwards;
@@ -117,73 +117,73 @@ generated quantities {
         for (i in 1:K) { // i = next (t)
                          // Murphy (2012) Eq. 17.58
                          // backwards t  + transition prob + local evidence at t
-          accumulator[i] = unbeta_tk[tbackwards, i] + logA_ij[tbackwards][i] + oblik_tk[tbackwards][i];
+          accumulator[i] = logbeta[tbackwards, i] + logA[tbackwards][i] + logoblik[tbackwards][i];
           }
-        unbeta_tk[tbackwards-1, j] = log_sum_exp(accumulator);
+        logbeta[tbackwards-1, j] = log_sum_exp(accumulator);
       }
     }
 
     for (t in 1:T)
-      beta_tk[t] = softmax(unbeta_tk[t]);
+      beta[t] = softmax(logbeta[t]);
   } // Backward
 
   { // Forwards-backwards algorithm log p(z_t = j | x_{1:T})
     for(t in 1:T)
-      ungamma_tk[t] = alpha_tk[t] .* beta_tk[t];
+      loggamma[t] = alpha[t] .* beta[t];
 
     for(t in 1:T)
-      gamma_tk[t] = normalize(ungamma_tk[t]);
+      gamma[t] = normalize(loggamma[t]);
   } // Forwards-backwards
 
   { // Fitted state
-    vector[K] reg_tk[T];
+    vector[K] reg[T];
     for(t in 1:T) {
       for(j in 1:K) {
-        reg_tk[t, j] = u_tm[t]' * to_vector(w_km[j]);
+        reg[t, j] = u[t]' * to_vector(w[j]);
       }
-      hatpi_tk[t] = softmax(reg_tk[t]);
-      hatz_t[t] = categorical_rng(hatpi_tk[t]);
+      hatpi[t] = softmax(reg[t]);
+      hatz[t] = categorical_rng(hatpi[t]);
     }
   }
 
   { // Fitted output
-    real reg_tk[T];
+    real reg[T];
     for(t in 1:T) {
-      reg_tk[t] = u_tm[t]' * b_km[hatz_t[t]];
-      hatx_t[t] = normal_rng(reg_tk[t], sigma_k[hatz_t[t]]);
+      reg[t] = u[t]' * b[hatz[t]];
+      haty[t] = normal_rng(reg[t], sigma[hatz[t]]);
     }
   }
 
   { // Viterbi decoding
-    int a_tk[T, K];                 // backpointer to the source of the link
-    real delta_tk[T, K];            // max prob for the seq up to t
+    int bpointer[T, K];             // backpointer to the source of the link
+    real delta[T, K];               // max prob for the seq up to t
                                     // with final output from state k for time t
 
     for (j in 1:K)
-      delta_tk[1, K] = oblik_tk[1][j];
+      delta[1, K] = logoblik[1][j];
 
     for (t in 2:T) {
       for (j in 1:K) {
-        delta_tk[t, j] = negative_infinity();
+        delta[t, j] = negative_infinity();
         for (i in 1:K) {
           real logp;
-          logp = delta_tk[t-1, i] + logA_ij[t][i] + oblik_tk[t][j];
-          if (logp > delta_tk[t, j]) {
-            a_tk[t, j] = i;
-            delta_tk[t, j] = logp;
+          logp = delta[t-1, i] + logA[t][i] + logoblik[t][j];
+          if (logp > delta[t, j]) {
+            bpointer[t, j] = i;
+            delta[t, j] = logp;
           }
         }
       }
     }
 
-    logp_zstar = max(delta_tk[T]);
+    logp_zstar = max(delta[T]);
 
     for (j in 1:K)
-      if (delta_tk[T, j] == logp_zstar)
-        zstar_t[T] = j;
+      if (delta[T, j] == logp_zstar)
+        zstar[T] = j;
 
     for (t in 1:(T - 1)) {
-      zstar_t[T - t] = a_tk[T - t + 1, zstar_t[T - t + 1]];
+      zstar[T - t] = bpointer[T - t + 1, zstar[T - t + 1]];
     }
   }
 }

@@ -277,13 +277,13 @@ data {
 
 parameters {
   // Discrete state model
-  simplex[K] p_1k;                  // initial state probabilities
-  simplex[K] A_ij[K];               // transition probabilities
-                                    // A_ij[i][j] = p(z_t = j | z_{t-1} = i)
+  simplex[K] pi0;                  // initial state probabilities
+  simplex[K] A[K];               // transition probabilities
+                                    // A[i][j] = p(z_t = j | z_{t-1} = i)
 
   // Continuous observation model
   ordered[K] mu_k;                  // observation means
-  real<lower=0> sigma_k[K];         // observation standard deviations
+  real<lower=0> sigma[K];         // observation standard deviations
 }
 \end{verbatim}
 
@@ -318,26 +318,26 @@ We break down the description of our code in these three steps.
 
 \NormalTok{hmm_generate <-}\StringTok{ }\NormalTok{function(K, T) \{}
   \CommentTok{# 1. Parameters}
-  \NormalTok{p_1k <-}\StringTok{ }\KeywordTok{runif_simplex}\NormalTok{(K)}
-  \NormalTok{A_ij <-}\StringTok{ }\KeywordTok{t}\NormalTok{(}\KeywordTok{replicate}\NormalTok{(K, }\KeywordTok{runif_simplex}\NormalTok{(K)))}
+  \NormalTok{pi0 <-}\StringTok{ }\KeywordTok{runif_simplex}\NormalTok{(K)}
+  \NormalTok{A <-}\StringTok{ }\KeywordTok{t}\NormalTok{(}\KeywordTok{replicate}\NormalTok{(K, }\KeywordTok{runif_simplex}\NormalTok{(K)))}
   \NormalTok{mu_k <-}\StringTok{ }\KeywordTok{sort}\NormalTok{(}\KeywordTok{rnorm}\NormalTok{(K, }\DecValTok{10} \NormalTok{*}\StringTok{ }\DecValTok{1}\NormalTok{:K, }\DecValTok{1}\NormalTok{))}
-  \NormalTok{sigma_k <-}\StringTok{ }\KeywordTok{abs}\NormalTok{(}\KeywordTok{rnorm}\NormalTok{(K))}
+  \NormalTok{sigma <-}\StringTok{ }\KeywordTok{abs}\NormalTok{(}\KeywordTok{rnorm}\NormalTok{(K))}
 
   \CommentTok{# 2. Hidden path}
-  \NormalTok{z_t <-}\StringTok{ }\KeywordTok{vector}\NormalTok{(}\StringTok{"numeric"}\NormalTok{, T)}
+  \NormalTok{z <-}\StringTok{ }\KeywordTok{vector}\NormalTok{(}\StringTok{"numeric"}\NormalTok{, T)}
 
-  \NormalTok{z_t[}\DecValTok{1}\NormalTok{] <-}\StringTok{ }\KeywordTok{sample}\NormalTok{(}\DecValTok{1}\NormalTok{:K, }\DataTypeTok{size =} \DecValTok{1}\NormalTok{, }\DataTypeTok{prob =} \NormalTok{p_1k)}
+  \NormalTok{z[}\DecValTok{1}\NormalTok{] <-}\StringTok{ }\KeywordTok{sample}\NormalTok{(}\DecValTok{1}\NormalTok{:K, }\DataTypeTok{size =} \DecValTok{1}\NormalTok{, }\DataTypeTok{prob =} \NormalTok{pi0)}
   \NormalTok{for (t in }\DecValTok{2}\NormalTok{:T)}
-    \NormalTok{z_t[t] <-}\StringTok{ }\KeywordTok{sample}\NormalTok{(}\DecValTok{1}\NormalTok{:K, }\DataTypeTok{size =} \DecValTok{1}\NormalTok{, }\DataTypeTok{prob =} \NormalTok{A_ij[z_t[t -}\StringTok{ }\DecValTok{1}\NormalTok{], ])}
+    \NormalTok{z[t] <-}\StringTok{ }\KeywordTok{sample}\NormalTok{(}\DecValTok{1}\NormalTok{:K, }\DataTypeTok{size =} \DecValTok{1}\NormalTok{, }\DataTypeTok{prob =} \NormalTok{A[z[t -}\StringTok{ }\DecValTok{1}\NormalTok{], ])}
 
   \CommentTok{# 3. Observations}
   \NormalTok{x_t <-}\StringTok{ }\KeywordTok{vector}\NormalTok{(}\StringTok{"numeric"}\NormalTok{, T)}
   \NormalTok{for (t in }\DecValTok{1}\NormalTok{:T)}
-    \NormalTok{x_t[t] <-}\StringTok{ }\KeywordTok{rnorm}\NormalTok{(}\DecValTok{1}\NormalTok{, mu_k[z_t[t]], sigma_k[z_t[t]])}
+    \NormalTok{x_t[t] <-}\StringTok{ }\KeywordTok{rnorm}\NormalTok{(}\DecValTok{1}\NormalTok{, y[z[t]], sigma[z[t]])}
 
   \KeywordTok{list}\NormalTok{(}\DataTypeTok{x_t =} \NormalTok{x_t, }\DataTypeTok{z_t =} \NormalTok{z_t,}
-       \DataTypeTok{theta =} \KeywordTok{list}\NormalTok{(}\DataTypeTok{p_1k =} \NormalTok{p_1k, }\DataTypeTok{A_ij =} \NormalTok{A_ij,}
-                    \DataTypeTok{mu_k =} \NormalTok{mu_k, }\DataTypeTok{sigma_k =} \NormalTok{sigma_k))}
+       \DataTypeTok{theta =} \KeywordTok{list}\NormalTok{(}\DataTypeTok{pi0 =} \NormalTok{pi0, }\DataTypeTok{A =} \NormalTok{A,}
+                    \DataTypeTok{mu_k =} \NormalTok{mu, }\DataTypeTok{sigma =} \NormalTok{sigma))}
 \NormalTok{\}}
 \end{Highlighting}
 \end{Shaded}
@@ -522,23 +522,23 @@ probability of the evidence
 
 \begin{verbatim}
 transformed parameters {
-  vector[K] unalpha_tk[T];
+  vector[K] logalpha[T];
 
   { // Forward algorithm log p(z_t = j | x_{1:t})
     real accumulator[K];
 
-    unalpha_tk[1] = log(p_1k) + normal_lpdf(x_t[1] | mu_k, sigma_k);
+    logalpha[1] = log(pi0) + normal_lpdf(x_t[1] | mu, sigma);
 
     for (t in 2:T) {
       for (j in 1:K) { // j = current (t)
         for (i in 1:K) { // i = previous (t-1)
                          // Murphy (2012) p. 609 eq. 17.48
                          // belief state      + transition prob + local evidence at t
-          accumulator[i] = unalpha_tk[t-1, i] 
-                           + log(A_ij[i, j]) 
-                           + normal_lpdf(x_t[t] | mu_k[j], sigma_k[j]);
+          accumulator[i] = logalpha[t-1, i] 
+                           + log(A[i, j]) 
+                           + normal_lpdf(x_t[t] | mu[j], sigma[j]);
         }
-        unalpha_tk[t, j] = log_sum_exp(accumulator);
+        logalpha[t, j] = log_sum_exp(accumulator);
       }
     }
   } // Forward
@@ -561,17 +561,17 @@ Since log domain should be preferred to avoid numerical underflow,
 multiplications are translated into sums of logs. Furthermore, we use
 Stan's implementation of the linear sums on the log scale to prevent
 underflow and overflow in the exponentiation (Stan Development Team
-2017c, 141). In consequence, \texttt{unalpha\_tk} represents the forward
+2017c, 141). In consequence, \texttt{unalpha\} represents the forward
 quantity in log scale and needs to be exponentially normalized for
 interpretability.
 
 \begin{verbatim}
 generated quantities {
-  vector[K] alpha_tk[T];
+  vector[K] alpha[T];
 
   { // Forward algortihm
     for (t in 1:T)
-      alpha_tk[t] = softmax(unalpha_tk[t]);
+      alpha[t] = softmax(logalpha[t]);
   } // Forward
 }
 \end{verbatim}
@@ -639,7 +639,7 @@ Then, the backward procedure can be expressed in matrix notation as
 
 At the last step, the base case is given by \[
 \beta_{T}(i)
-  = p(\mat{x}_{T+1:T} | z_{T} = i) = p(\varnothing | z_T = i) = 1.
+  = p(\mat{x}_{T+1:T} | z_{T} = i) = p(\varnothing | z_t = i) = 1.
 \]
 
 Intuitively, the forward-backward algorithm passes information from left
@@ -660,22 +660,22 @@ functions {
 }
 
 generated quantities {
-  vector[K] unbeta_tk[T];
-  vector[K] ungamma_tk[T];
+  vector[K] logbeta[T];
+  vector[K] loggamma[T];
 
-  vector[K] beta_tk[T];
-  vector[K] gamma_tk[T];
+  vector[K] beta[T];
+  vector[K] gamma[T];
 
   { // Forward algortihm
     for (t in 1:T)
-      alpha_tk[t] = softmax(unalpha_tk[t]);
+      alpha[t] = softmax(logalpha[t]);
   } // Forward
 
   { // Backward algorithm log p(x_{t+1:T} | z_t = j)
     real accumulator[K];
 
     for (j in 1:K)
-      unbeta_tk[T, j] = 1;
+      logbeta[T, j] = 1;
 
     for (tforward in 0:(T-2)) {
       int t;
@@ -685,25 +685,25 @@ generated quantities {
         for (i in 1:K) { // i = next (t)
                          // Murphy (2012) Eq. 17.58
                          // backwards t    + transition prob + local evidence at t
-          accumulator[i] = unbeta_tk[t, i] 
-                           + log(A_ij[j, i]) 
-                           + normal_lpdf(x_t[t] | mu_k[i], sigma_k[i]);
+          accumulator[i] = logbeta[t, i] 
+                           + log(A[j, i]) 
+                           + normal_lpdf(x_t[t] | mu[i], sigma[i]);
           }
-        unbeta_tk[t-1, j] = log_sum_exp(accumulator);
+        logbeta[t-1, j] = log_sum_exp(accumulator);
       }
     }
 
     for (t in 1:T)
-      beta_tk[t] = softmax(unbeta_tk[t]);
+      beta[t] = softmax(logbeta[t]);
   } // Backward
 
   { // forward-backward algorithm log p(z_t = j | x_{1:T})
     for(t in 1:T) {
-        ungamma_tk[t] = alpha_tk[t] .* beta_tk[t];
+        loggamma[t] = alpha[t] .* beta[t];
     }
 
     for(t in 1:T)
-      gamma_tk[t] = normalize(ungamma_tk[t]);
+      gamma[t] = normalize(loggamma[t]);
   } // forward-backward
 }
 \end{verbatim}
@@ -796,49 +796,49 @@ implementation runs in \(O(TK)\) time.
 
 \begin{verbatim}
 generated quantities {
-  int<lower=1, upper=K> zstar_t[T];
-  real logp_zstar_t;
+  int<lower=1, upper=K> zstar[T];
+  real logp_zstar;
 
   { // Viterbi algorithm
-    int a_tk[T, K];       // backpointer to the most likely previous state 
+    int a[T, K];       // backpointer to the most likely previous state 
                           // on the most probable path
-    real delta_tk[T, K];  // max prob for the sequence up to t
+    real delta[T, K];  // max prob for the sequence up to t
                           // that ends with an emission from state k
 
     for (j in 1:K)
-      delta_tk[1, K] = normal_lpdf(x_t[1] | mu_k[j], sigma_k[j]);
+      delta[1, K] = normal_lpdf(x_t[1] | mu[j], sigma[j]);
 
     for (t in 2:T) {
       for (j in 1:K) { // j = current (t)
-        delta_tk[t, j] = negative_infinity();
+        delta[t, j] = negative_infinity();
         for (i in 1:K) { // i = previous (t-1)
           real logp;
-          logp = delta_tk[t-1, i] 
-                 + log(A_ij[i, j]) 
-                 + normal_lpdf(x_t[t] | mu_k[j], sigma_k[j]);
-          if (logp > delta_tk[t, j]) {
-            a_tk[t, j] = i;
-            delta_tk[t, j] = logp;
+          logp = delta[t-1, i] 
+                 + log(A[i, j]) 
+                 + normal_lpdf(x_t[t] | mu[j], sigma[j]);
+          if (logp > delta[t, j]) {
+            a[t, j] = i;
+            delta[t, j] = logp;
           }
         }
       }
     }
 
-    logp_zstar_t = max(delta_tk[T]);
+    logp_zstar = max(delta[T]);
 
     for (j in 1:K)
-      if (delta_tk[T, j] == logp_zstar_t)
-        zstar_t[T] = j;
+      if (delta[T, j] == logp_zstar)
+        zstar[T] = j;
 
     for (t in 1:(T - 1)) {
-      zstar_t[T - t] = a_tk[T - t + 1, zstar_t[T - t + 1]];
+      zstar[T - t] = a[T - t + 1, zstar[T - t + 1]];
     }
   }
 }
 \end{verbatim}
 
-The variable \texttt{delta\_tk} is a straightforward implementation of
-the corresponding equation. \texttt{a\_tk} is the traceback needed to
+The variable \texttt{delta\} is a straightforward implementation of
+the corresponding equation. \texttt{a\} is the traceback needed to
 compute the most probable sequence of states after the most probably
 final state \texttt{zstar\_t} is computed.
 
@@ -853,7 +853,7 @@ parameters.
 
 \begin{verbatim}
 model {
-  target += log_sum_exp(unalpha_tk[T]); // Note: update based only on last unalpha_tk
+  target += log_sum_exp(logalpha[T]); // Note: update based only on last logalpha
 }
 \end{verbatim}
 
@@ -880,7 +880,7 @@ to produce a likelihood that is proportional to the expanded model.
 
   \KeywordTok{list}\NormalTok{(}
     \DataTypeTok{mu_k =} \NormalTok{init.mu[init.order],}
-    \DataTypeTok{sigma_k =} \NormalTok{init.sigma[init.order]}
+    \DataTypeTok{sigma =} \NormalTok{init.sigma[init.order]}
   \NormalTok{)}
 \NormalTok{\}}
 
@@ -1050,16 +1050,16 @@ data {
   int<lower=1> M;                   // size of the input vector
 
   real x_t[T];                      // output (scalar so far)
-  vector[M] u_tm[T];                // input vectors
+  vector[M] u[T];                // input vectors
 }
 
 parameters {
   // Discrete state model
-  simplex[K] p_1k;                  // initial state probabilities
-  vector[M] w_km[K];                // state regressors
+  simplex[K] pi0;                  // initial state probabilities
+  vector[M] w[K];                // state regressors
 
   // Continuous observation model
-  vector[M] b_km[K];                // mean regressors
+  vector[M] b[K];                // mean regressors
   real<lower=0.0001> s_k[K];        // residual standard deviations
 }
 \end{verbatim}
@@ -1086,28 +1086,28 @@ that drives the latent process.
 
 \begin{verbatim}
 transformed parameters {
-  vector[K] unalpha_tk[T];
+  vector[K] logalpha[T];
 
-  vector[K] unA_ij[T];
-  vector[K] A_ij[T];
+  vector[K] unA[T];
+  vector[K] A[T];
 
-  vector[K] oblik_tk[T];
+  vector[K] logoblik[T];
 
-  { // Transition probability matrix p(z_t = j | z_{t-1} = i, u_t)
-    unA_ij[1] = p_1k; // Filler
-    A_ij[1] = p_1k; // Filler
+  { // Transition probability matrix p(z_t = j | z_{t-1} = i, u)
+    unA[1] = pi0; // Filler
+    A[1] = pi0; // Filler
     for (t in 2:T) {
       for (j in 1:K) { // j = current (t)
-        unA_ij[t][j] = u_t[t]' * w_km[j];
+        unA[t][j] = u[t]' * w[j];
       }
-      A_ij[t] = softmax(unA_ij[t]);
+      A[t] = softmax(unA[t]);
     }
   }
 
   { // Evidence (observation likelihood)
     for(t in 1:T) {
       for(j in 1:K) {
-        oblik_tk[t][j] = normal_lpdf(x_t[t] | mu_k[j], s_k[j]);
+        logoblik[t][j] = normal_lpdf(x_t[t] | mu[j], s_k[j]);
       }
     }
   }
@@ -1116,18 +1116,18 @@ transformed parameters {
     real accumulator[K];
 
     for(j in 1:K)
-      unalpha_tk[1][j] = log(p_1k[j]) + oblik_tk[1][j];
+      logalpha[1][j] = log(pi0[j]) + logoblik[1][j];
 
     for (t in 2:T) {
       for (j in 1:K) { // j = current (t)
         for (i in 1:K) { // i = previous (t-1)
                          // Murphy (2012) Eq. 17.48
                          // belief state + transition prob + local evidence at t
-          accumulator[i] = unalpha_tk[t-1, i] 
-                           + log(A_ij[t][i]) 
-                           + oblik_tk[t][j];
+          accumulator[i] = logalpha[t-1, i] 
+                           + log(A[t][i]) 
+                           + logoblik[t][j];
         }
-        unalpha_tk[t, j] = log_sum_exp(accumulator);
+        logalpha[t, j] = log_sum_exp(accumulator);
       }
     }
   } // Forward
@@ -1273,39 +1273,39 @@ state.
   \CommentTok{# 1. Parameters}
   \NormalTok{K <-}\StringTok{ }\DecValTok{3}
   \NormalTok{M <-}\StringTok{ }\DecValTok{4}
-  \NormalTok{u_tm <-}\StringTok{ }\KeywordTok{matrix}\NormalTok{(}\KeywordTok{rnorm}\NormalTok{(T *}\StringTok{ }\NormalTok{M), }\DataTypeTok{nrow =} \NormalTok{T, }\DataTypeTok{ncol =} \NormalTok{M, }\DataTypeTok{byrow =} \OtherTok{TRUE}\NormalTok{)}
-  \NormalTok{w_km <-}\StringTok{ }\KeywordTok{matrix}\NormalTok{(}
+  \NormalTok{u <-}\StringTok{ }\KeywordTok{matrix}\NormalTok{(}\KeywordTok{rnorm}\NormalTok{(T *}\StringTok{ }\NormalTok{M), }\DataTypeTok{nrow =} \NormalTok{T, }\DataTypeTok{ncol =} \NormalTok{M, }\DataTypeTok{byrow =} \OtherTok{TRUE}\NormalTok{)}
+  \NormalTok{w <-}\StringTok{ }\KeywordTok{matrix}\NormalTok{(}
     \KeywordTok{c}\NormalTok{(}\FloatTok{1.2}\NormalTok{, }\FloatTok{0.5}\NormalTok{, }\FloatTok{0.3}\NormalTok{, }\FloatTok{0.1}\NormalTok{, }\FloatTok{0.5}\NormalTok{, }\FloatTok{1.2}\NormalTok{, }\FloatTok{0.3}\NormalTok{, }\FloatTok{0.1}\NormalTok{, }\FloatTok{0.5}\NormalTok{, }\FloatTok{0.1}\NormalTok{, }\FloatTok{1.2}\NormalTok{, }\FloatTok{0.1}\NormalTok{),}
     \DataTypeTok{nrow =} \NormalTok{K, }\DataTypeTok{ncol =} \NormalTok{M, }\DataTypeTok{byrow =} \OtherTok{TRUE}\NormalTok{)}
-  \NormalTok{b_km <-}\StringTok{ }\KeywordTok{matrix}\NormalTok{(}
+  \NormalTok{b <-}\StringTok{ }\KeywordTok{matrix}\NormalTok{(}
     \KeywordTok{c}\NormalTok{(}\FloatTok{5.0}\NormalTok{, }\FloatTok{6.0}\NormalTok{, }\FloatTok{7.0}\NormalTok{, }\FloatTok{0.5}\NormalTok{, }\FloatTok{1.0}\NormalTok{, }\FloatTok{5.0}\NormalTok{, }\FloatTok{0.1}\NormalTok{, -}\FloatTok{0.5}\NormalTok{, }\FloatTok{0.1}\NormalTok{, -}\FloatTok{1.0}\NormalTok{, -}\FloatTok{5.0}\NormalTok{, }\FloatTok{0.2}\NormalTok{),}
     \DataTypeTok{nrow =} \NormalTok{K, }\DataTypeTok{ncol =} \NormalTok{M, }\DataTypeTok{byrow =} \OtherTok{TRUE}\NormalTok{)}
-  \NormalTok{sigma_k <-}\StringTok{ }\KeywordTok{c}\NormalTok{(}\FloatTok{0.2}\NormalTok{, }\FloatTok{1.0}\NormalTok{, }\FloatTok{2.5}\NormalTok{)}
-  \NormalTok{p_1k <-}\StringTok{ }\KeywordTok{c}\NormalTok{(}\FloatTok{0.4}\NormalTok{, }\FloatTok{0.2}\NormalTok{, }\FloatTok{0.4}\NormalTok{)}
+  \NormalTok{sigma <-}\StringTok{ }\KeywordTok{c}\NormalTok{(}\FloatTok{0.2}\NormalTok{, }\FloatTok{1.0}\NormalTok{, }\FloatTok{2.5}\NormalTok{)}
+  \NormalTok{pi0 <-}\StringTok{ }\KeywordTok{c}\NormalTok{(}\FloatTok{0.4}\NormalTok{, }\FloatTok{0.2}\NormalTok{, }\FloatTok{0.4}\NormalTok{)}
   
   \NormalTok{p.mat <-}\StringTok{ }\KeywordTok{matrix}\NormalTok{(}\DecValTok{0}\NormalTok{, }\DataTypeTok{nrow =} \NormalTok{T, }\DataTypeTok{ncol =} \NormalTok{K)}
-  \NormalTok{p.mat[}\DecValTok{1}\NormalTok{, ] <-}\StringTok{ }\NormalTok{p_1k}
+  \NormalTok{p.mat[}\DecValTok{1}\NormalTok{, ] <-}\StringTok{ }\NormalTok{pi0}
 
   \CommentTok{# 2. Hidden path}
-  \NormalTok{z_t <-}\StringTok{ }\KeywordTok{vector}\NormalTok{(}\StringTok{"numeric"}\NormalTok{, T)}
-  \NormalTok{z_t[}\DecValTok{1}\NormalTok{] <-}\StringTok{ }\KeywordTok{sample}\NormalTok{(}\DataTypeTok{x =} \DecValTok{1}\NormalTok{:K, }\DataTypeTok{size =} \DecValTok{1}\NormalTok{, }\DataTypeTok{replace =} \OtherTok{FALSE}\NormalTok{, }\DataTypeTok{prob =} \NormalTok{p_1k)}
+  \NormalTok{z <-}\StringTok{ }\KeywordTok{vector}\NormalTok{(}\StringTok{"numeric"}\NormalTok{, T)}
+  \NormalTok{z[}\DecValTok{1}\NormalTok{] <-}\StringTok{ }\KeywordTok{sample}\NormalTok{(}\DataTypeTok{x =} \DecValTok{1}\NormalTok{:K, }\DataTypeTok{size =} \DecValTok{1}\NormalTok{, }\DataTypeTok{replace =} \OtherTok{FALSE}\NormalTok{, }\DataTypeTok{prob =} \NormalTok{pi0)}
   \NormalTok{for (t in }\DecValTok{2}\NormalTok{:T) \{}
-    \NormalTok{p.mat[t, ] <-}\StringTok{ }\KeywordTok{softmax}\NormalTok{(}\KeywordTok{sapply}\NormalTok{(}\DecValTok{1}\NormalTok{:K, function(j) \{u_tm[t, ] %*%}\StringTok{ }\NormalTok{w_km[j, ]\}))}
-    \NormalTok{z_t[t] <-}\StringTok{ }\KeywordTok{sample}\NormalTok{(}\DataTypeTok{x =} \DecValTok{1}\NormalTok{:K, }\DataTypeTok{size =} \DecValTok{1}\NormalTok{, }\DataTypeTok{replace =} \OtherTok{FALSE}\NormalTok{, }\DataTypeTok{prob =} \NormalTok{p.mat[t, ])}
+    \NormalTok{p.mat[t, ] <-}\StringTok{ }\KeywordTok{softmax}\NormalTok{(}\KeywordTok{sapply}\NormalTok{(}\DecValTok{1}\NormalTok{:K, function(j) \{u[t, ] %*%}\StringTok{ }\NormalTok{w[j, ]\}))}
+    \NormalTok{z[t] <-}\StringTok{ }\KeywordTok{sample}\NormalTok{(}\DataTypeTok{x =} \DecValTok{1}\NormalTok{:K, }\DataTypeTok{size =} \DecValTok{1}\NormalTok{, }\DataTypeTok{replace =} \OtherTok{FALSE}\NormalTok{, }\DataTypeTok{prob =} \NormalTok{p.mat[t, ])}
   \NormalTok{\}}
 
   \CommentTok{# 3. Observations}
   \NormalTok{x_t <-}\StringTok{ }\KeywordTok{vector}\NormalTok{(}\StringTok{"numeric"}\NormalTok{, T)}
   \NormalTok{for (t in }\DecValTok{1}\NormalTok{:T) \{}
-    \NormalTok{x_t[t] <-}\StringTok{ }\KeywordTok{rnorm}\NormalTok{(}\DecValTok{1}\NormalTok{, u_tm[t, ] %*%}\StringTok{ }\NormalTok{b_km[z_t[t], ], sigma_k[z_t[t]])}
+    \NormalTok{x_t[t] <-}\StringTok{ }\KeywordTok{rnorm}\NormalTok{(}\DecValTok{1}\NormalTok{, u[t, ] %*%}\StringTok{ }\NormalTok{b[z[t], ], sigma[z[t]])}
   \NormalTok{\}}
 
   \KeywordTok{list}\NormalTok{(}
-    \DataTypeTok{u_tm =} \NormalTok{u_tm,}
+    \DataTypeTok{u =} \NormalTok{u,}
     \DataTypeTok{z_t =} \NormalTok{z_t,}
     \DataTypeTok{x_t =} \NormalTok{x_t,}
-    \DataTypeTok{theta =} \KeywordTok{list}\NormalTok{(}\DataTypeTok{p_1k =} \NormalTok{p_1k, }\DataTypeTok{w_km =} \NormalTok{w_km,}
-                 \DataTypeTok{b_km =} \NormalTok{b_km, }\DataTypeTok{sigma_k =} \NormalTok{sigma_k, }\DataTypeTok{p.mat =} \NormalTok{p.mat)}
+    \DataTypeTok{theta =} \KeywordTok{list}\NormalTok{(}\DataTypeTok{pi0 =} \NormalTok{pi0, }\DataTypeTok{w =} \NormalTok{w,}
+                 \DataTypeTok{b =} \NormalTok{b, }\DataTypeTok{sigma =} \NormalTok{sigma, }\DataTypeTok{p.mat =} \NormalTok{p.mat)}
   \NormalTok{)}
 \NormalTok{\}}
 \end{Highlighting}
