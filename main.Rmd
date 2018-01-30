@@ -51,7 +51,7 @@ cat("
 ")
 ```
 
-This case study documents the implementation in [Stan](http://mc-stan.org/) [@carpenter2017stan] of the Hidden Markov Model (HMM) for unsupervised learning [@baum1966statistical; @baum1967inequality; @baum1968growth; @baum1970maximization; @baum1972inequality]. Additionally, we present the adaptations needed for the Input-Output Hidden Markov Model (IOHMM). IOHMM is an architecture proposed by @bengio1994input to map input sequences, sometimes called the control signal, to output sequences. Compared to HMM, it aims at being especially effective at learning long term memory, that is when input-output sequences span long points. In all cases, we provide a fully Bayesian estimation of the model parameters and inference on hidden quantities, namely filtered and smoothed posterior distribution of the hidden states, and jointly most probable state path. Finally, we illustrate the use HMMs as a component within more complex models with a volatility model taken from the econometrics literature. 
+This case study documents the implementation in [Stan](http://mc-stan.org/) [@carpenter2017stan] of the Hidden Markov Model (HMM) for unsupervised learning [@baum1966statistical; @baum1967inequality; @baum1968growth; @baum1970maximization; @baum1972inequality]. Additionally, we present the adaptations needed for the Input-Output Hidden Markov Model (IOHMM). IOHMM is an architecture proposed by @bengio1994input to map input sequences, sometimes called the control signal, to output sequences. Compared to HMM, it aims at being especially effective at learning long term memory, that is when input-output sequences span long points. Finally, we illustrate the use HMMs as a component within more complex models with a volatility model taken from the econometrics literature. In all cases, we provide a fully Bayesian estimation of the model parameters and inference on hidden quantities, namely filtered and smoothed posterior distribution of the hidden states, and jointly most probable state path. 
 
 _A Tutorial on Hidden Markov Models using Stan_ is distributed under the [Creative Commons Attribution 4.0 International Public License](cc-by-v4.0.md). Accompanying code is distributed under the [GNU General Public License v3.0](gnu-gpl-v3.0.md). See the [README](README.md) file for details. All files are available in the [stancon18](https://github.com/luisdamiano/stancon18) GitHub repository.
 
@@ -61,10 +61,10 @@ _A Tutorial on Hidden Markov Models using Stan_ is distributed under the [Creati
 
 Real-world processes produce observable outputs characterized as signals. These can be discrete or continuous in nature, can be pure or embed uncertainty about the measurements and the explanatory model, come from a stationary or non-stationary source, among many other variations. These signals are modeled to allow for both theoretical descriptions and practical applications. The model itself can be deterministic or stochastic, in which case the signal is characterized as a parametric random process whose parameters can be estimated in a well-defined manner.
 
-Autocorrelation, a key feature in most signals, can be modeled in countless forms. While certainly pertinent to this purpose, high-order Markov chains can prove inconvenient when the range of the correlation among the observations is long. A more parsimonious approach assumes that the observed sequence is a noisy observation of an underlying hidden process represented as a first-order Markov chain. In other terms, long-range dependencies between observations are mediated via latent variables. It is important to note that the Markov property is only assumed for the hidden states, and the observations are assumed conditionally independent given these latent states.
+Many real-world signals exhibit significant autocorrelation and an extensive literature exists on different means to characterize and model different forms of autocorrelation. One of the simplest and most intuitive is the higher-order Markov process, which extends the "memory" of a standard Markov process beyond the single previous observation. The higher-order Markov process, unfortunately, is not as analytically tractable as its standard version and poses difficulties for statistical inference. A more parsimonious approach assumes that the observed sequence is a noisy observation of an underlying hidden process represented as a first-order Markov chain. In other terms, long-range dependencies between observations are mediated via latent variables. It is important to note that the Markov property is only assumed for the hidden states, and the observations are assumed conditionally independent given these latent states. While the observations may not exhibit any Markov behavior, the simple Markovian structure of the hidden states is sufficient to allow easy inference. 
 
 ## Model specification
-HMM involve two interconnected models. The state model consists of a discrete-time, discrete-state, first-order Markov chain $z_t \in \{1, \dots, K\}$ that transitions according to $p(z_t | z_{t-1})$. In turns, the observation model is governed by $p(\mat{y}_t | z_t)$, where $\mat{y}_t$ are the observations, emissions or output [^bold_outputs]. The corresponding joint distribution is
+HMM involve two interconnected models. The state model consists of a discrete-time, discrete-state[^discrete] first-order Markov chain $z_t \in \{1, \dots, K\}$ that transitions according to $p(z_t | z_{t-1})$. In turns, the observation model is governed by $p(\mat{y}_t | z_t)$, where $\mat{y}_t$ are the observations, emissions or output [^bold_outputs]. The corresponding joint distribution is
 
 \[
 p(\mat{z}_{1:T}, \mat{y}_{1:T})
@@ -155,7 +155,7 @@ hmm_generate <- function(K, T) {
 
 The parameters to be generated include the $K$-sized initial state distribution vector $\mat{\pi}_1$ and the $K \times K$ transition matrix $\mat{A}$. There are $(K-1)(K+1)$ free parameters as the vector and each row of the matrix are simplexes.
 
-We set up uniform priors for $\mat{\pi}_1$ and $\mat{A}$, a weakly informative Gaussian for the location parameter $\mu_k$ and a weakly informative half-Gaussian that ensures positivity for the scale parameters $\sigma_k$. An ordinal constraint is imposed on the location parameter to restrict the exploration of the symmetric, degenerate mixture posterior surface to a single ordering of the parameters, thus solving the non-identifiability issues inherent to the model density [@betancourt2017identifying]. In the simulation routine, the location parameters are adjusted to ensure that the observations are well-separated. We refer the reader to the [Prior Choice Recommendations](https://github.com/stan-dev/stan/wiki/Prior-Choice-Recommendations) wiki article for very useful practical guidelines that are both computationally and statistically meaningful. Given the fixed quantity $K$, we draw one sample from the prior distributions $\mat{\theta}^{(0)} \sim p(\mat{\theta})$.
+We set up uniform priors for $\mat{\pi}_1$ and $\mat{A}$, a weakly informative Gaussian for the location parameter $\mu_k$ and a weakly informative half-Gaussian that ensures positivity for the scale parameters $\sigma_k$. An ordinal constraint is imposed on the location parameter to restrict the exploration of the symmetric, degenerate mixture posterior surface to a single ordering of the parameters, thus solving the non-identifiability issues inherent to the model density [@betancourt2017identifying]. In the simulation routine, the location parameters are adjusted to ensure that the observations are well-separated. We refer the reader to the Stan Development Team's [Prior Choice Recommendations](https://github.com/stan-dev/stan/wiki/Prior-Choice-Recommendations) Wiki article for advice on selecting priors which are simultaneously computationally efficient and statistically reasonable. Given the fixed quantity $K$, we draw one sample from the prior distributions $\mat{\theta}^{(0)} \sim p(\mat{\theta})$.
 
 ### Generating the hidden path
 
@@ -238,7 +238,7 @@ knitr::kable(df, format = "html", col.names = df.col,
 ### Filtering
 A filter infers the posterior distribution of the hidden states at a given step $t$ based on all the information available up to that point $p(z_t | \mat{y}_{1:t})$. It achieves better noise reduction than simply estimating the hidden state based on the current estimate $p(z_t | \mat{y}_{t})$. The filtering process can be run online, or recursively, as new data streams in.
 
-Filtered marginals can be computed recursively by means of the forward algorithm [@baum1967inequality]. Let $\psi_t(j) = p(\mat{y}_t | z_t = j)$ be the local evidence at step $t$ and $\Psi(i, j) = p(z_t = j | z_{t-1} = i)$ be the transition probability. First, the one-step-ahead predictive density is computed
+Filtered marginals can be computed recursively using the forward algorithm [@baum1967inequality]. Let $\psi_t(j) = p(\mat{y}_t | z_t = j)$ be the local evidence at step $t$ and $\Psi(i, j) = p(z_t = j | z_{t-1} = i)$ be the transition probability. First, the one-step-ahead predictive density is computed
 
 \[
 p(z_t = j | \mat{y}_{1:t-1}) = \sum_{i}{\Psi(i, j) p(z_{t-1} = i | \mat{y}_{1:t-1})}.
@@ -429,8 +429,6 @@ generated quantities {
 
 The reader should not be deceived by the similarity to the code shown in the filtering section. Note that the indices in the log transition matrix are inverted and the evidence is now computed for the next state. We need to invert the time index as backward ranges are not available in Stan.
 
-#### Inference recapitulation
-
 The forward-backward algorithm was designed to exploit via recursion the conditional independencies in the HMM. First, the posterior marginal probability of the latent states at a given time step is broken down into two quantities: the past and the future components. Second, taking advantage of the Markov properties, each of the two are further broken down into simpler pieces via conditioning and marginalizing, thus creating an efficient predict-update cycle.
 
 This strategy makes otherwise unfeasible calculations possible. Consider for example a time series with $T = 100$ observations and $K = 5$ hidden states. Summing the joint probability over all possible state sequences would involve $2 \times 100 \times 5^{100} \approx 10^{72}$ computations, while the forward and backward passes only take $3,000$ each. Moreover, one pass may be avoided depending on the goal of the data analysis. Summing the forward probabilities at the last time step is enough to compute the likelihood, and the backwards recursion would be only needed if the posterior probabilities of the states were also required.
@@ -443,7 +441,7 @@ It is also of interest to compute the most probable state sequence or path,
 \mat{z}^* = \argmax_{\mat{z}_{1:T}} p(\mat{z}_{1:T} | \mat{y}_{1:T}).
 \]
 
-The jointly most probable sequence of states can be inferred by means of maximum a posterior (MAP) estimation. It is not necessarily the same as the sequence of marginally most probable states given by the maximizer of the posterior marginals (MPM),
+The jointly most probable sequence of states can be inferred via maximum *a posteriori* (MAP) estimation. Note that the jointly most probable sequence is not necessarily the same as the sequence of marginally most probable states given by the maximizer of the posterior marginals (MPM),
 
 \[
 \mat{\hat{z}} = (\argmax_{z_1} p(z_1 | \mat{y}_{1:T}), \ \dots, \ \argmax_{z_T} p(z_T | \mat{y}_{1:T})),
@@ -451,7 +449,7 @@ The jointly most probable sequence of states can be inferred by means of maximum
 
 which maximizes the expected number of correct individual states.
 
-The MAP estimate is always globally consistent: while locally a state may be most probable at a given step, the Viterbi or max-sum algorithm decodes the most likely single plausible path [@viterbi1967error]. Furthermore, the MPM sequence may have zero joint probability if it includes two successive states that, while being individually the most probable, are connected in the transition matrix by a zero. On the other hand, MPM can be considered more robust since the state at each step is estimated by averaging over its neighbors rather than conditioning on a specific value of them.
+The MAP estimate is always globally consistent: while locally a state may be most probable at a given step, the Viterbi or max-sum algorithm decodes the most likely single plausible path [@viterbi1967error]. Furthermore, the MPM sequence may have zero joint probability if it includes two successive states that, while being individually the most probable, are connected in the transition matrix by a zero. On the other hand, MPM may be considered more robust since the state at each step is estimated by averaging over its neighbors rather than conditioning on a specific value of them.
 
 The Viterbi applies the max-sum algorithm in a forward fashion plus a traceback procedure to recover the most probable path. In simple terms, once the most probable state $z_t$ is estimated, the procedure conditions the previous states on it. Let $\delta_t(j)$ be the probability of arriving to the state $j$ at step $t$ given the most probable path was taken,
 
@@ -551,7 +549,7 @@ model {
 }
 ```
 
-As we expect high multimodality in the posterior density, we use a clustering algorithm to feed the sampler with initialization values for the location and scale parameters. Although K-means is not truthful to the real model because it does not consider the time-dependent nature of the data, it provides an educated guess.
+As we expect high multimodality in the posterior density, we use a clustering algorithm to feed the sampler with initialization values for the location and scale parameters. Although $K$-means is not a good choice for this data because it does not consider the time-dependent nature of the data, it provides an educated guess sufficient for initialization
 
 ```{r hmm_estimate, echo = TRUE, eval = TRUE}
 hmm_init <- function(K, y) {
@@ -586,7 +584,7 @@ hmm_fit <- function(K, y) {
 }
 ```
 
-## A walk-through
+## Worked Example
 
 We draw one sample of length $T = 500$ from a data generating process with $K = 3$ latent states. We fit the model using the Stan code and the initialization methodology introduced previously.
 
@@ -600,7 +598,7 @@ fit      <- hmm_fit(K, dataset$y)
 
 The estimates are extremely efficient as expected when dealing with generated data. The Markov Chain are well behaved as diagnosed by the low Monte Carlo standard error, the high effective sample size and the near-one shrink factor of @gelman1992inference. Although not shown, further diagnostics confirm satisfactory mixing, convergence and the absence of divergences. Point estimates and posterior intervals are provided by rstan's `summary` function.
 
-```{r hmm_walkthrough_summary, echo = TRUE, eval = TRUE}
+```{r hmm_walkthrough_summary, echo = FALSE, eval = TRUE}
 knitr::kable(cbind(
              unlist(list(dataset$theta$pi1, 
                         t(dataset$theta$A), 
@@ -613,7 +611,7 @@ knitr::kable(cbind(
       digits = 2, align = "r", caption = "Estimated parameters and hidden quantities. *MCSE = Monte Carlo Standard Error, SE = Standard Error, ESS = Effective Sample Size*.")
 ```
 
-We extract the samples for some quantities of interest, namely the filtered probabilities vector $\mat{\alpha}_t$, the smoothed probability vector $\mat{\gamma}_t$ and the most probable hidden path $\mat{z}^*$. As an informal assessment that our software recover the hidden states correctly, we observe that the filtered probability, the smoothed probability and the most likely path are all reasonable accurate to the true values. As expected, the MAP estimate recovers the simulated hidden path with no label switching due because of the ordinal constraints.
+We extract the samples for some quantities of interest, namely the filtered probabilities vector $\mat{\alpha}_t$, the smoothed probability vector $\mat{\gamma}_t$ and the most probable hidden path $\mat{z}^*$. As an informal assessment that our software recover the hidden states correctly, we observe that the filtered probability, the smoothed probability and the most likely path are all reasonable accurate to the true values. As expected, because we used an ordering constraint to break symmetry, the MAP estimate is able to successfully recover the (simulated) hidden path without label switching.
 
 ```{r hmm_walkthrough_stateprobability, echo = TRUE, eval = TRUE, fig.height = 9, out.width="\\textwidth"}
 alpha <- extract(fit, pars = 'alpha')[[1]]
@@ -647,7 +645,7 @@ plot_outputvit(x = dataset$y,
 
 # The Input-Output Hidden Markov Model
 
-The IOHMM is an architecture proposed by @bengio1994input to map input sequences, sometimes called the control signal, to output sequences. It is a probabilistic framework that can deal with general sequence processing tasks such as production, classification and prediction. The main difference with Hidden Markov Models (HMM), which are part of the unsupervised learning paradigm, is the capability to learn the output sequence itself instead of the distribution of the output sequence.
+The IOHMM is an architecture proposed by @bengio1994input to map input sequences, sometimes called the control signal, to output sequences. It is a probabilistic framework that can deal with general sequence processing tasks such as production, classification and prediction. The main difference from classical Hidden Markov Models (HMM), which are unsupervised learners, is the capability to learn the output sequence itself instead of the distribution of the output sequence.
 
 ## Definitions
 
@@ -796,11 +794,11 @@ Similarly, inference about the smoothed posterior marginal requires the adaptati
   & = \sum_{j = 1}^{K}{\psi_t(j) \Psi_t(i, j) \beta_{t}(j)}.
 \end{align*}
 
-Once adjusted the transition probability matrix, the Stan code for the forward-backward algorithm need no further modification.
+Once we have adjusted the transition probability matrix, the Stan code for the forward-backward algorithm need no further modification.
 
 ### MAP: Viterbi
 
-The Stan code for the Viterbi decoding algorithm need no further modification.
+The Viterbi algorithm described above can be applied to the IOHMM without modification. 
 
 ## Parameter estimation
 
@@ -808,7 +806,7 @@ The parameters of the models are $\mat{\theta} = (\mat{\pi}_1, \mat{\theta}_h, \
 
 Estimation can be run under both the maximum likelihood and Bayesian frameworks. Although it is a straightforward procedure when the data is fully observed, in practice the latent states $\mat{z}_{1:T}$ are hidden. The most common approach is the application of the EM algorithm to find either the maximum likelihood or the maximum a posteriori estimates. @bengio1994input proposes a straightforward modification of the EM algorithm. The application of sigmoidal functions, for example the logistic or softmax transforms for the hidden transition model, requires numeric optimization via gradient ascent or similar methods for the M step. In this work, we exploit Stan's capabilities to produce a sampler that explores the posterior density of the model parameters.
 
-## A walk-though
+## A Simulation Example
 
 ### Numerical stability for the softmax function
 Before we begin, we pause for a minor digression on numerical stability. 
@@ -837,9 +835,9 @@ softmax(x)
 
 This is already taken care in Stan [@team2017stan, p. 478].
 
-### Back to the walk-though 
+### Simulation Example
 
-We first adapt the R routine for our new generative model. The arguments are the sequence length $T$, the number of discrete hidden states $K$, the input matrix $\mat{u}$, the initial state distribution vector $\mat{\pi}_1$, a matrix with the parameters of the multinomial regression that rules the hidden states dynamics $\mat{w}$, the name of a function drawing samples from the observation distribution and its arguments.
+We first adapt the `R` routine used to simulate data from our new generative model. The arguments are the sequence length $T$, the number of discrete hidden states $K$, the input matrix $\mat{u}$, the initial state distribution vector $\mat{\pi}_1$, a matrix with the parameters of the multinomial regression that rules the hidden states dynamics $\mat{w}$, the name of a function drawing samples from the observation distribution and its arguments.
 
 The initial hidden state is drawn from a multinomial distribution with one trial and event probabilities given by the initial state probability vector $\mat{\pi}_1$. The latent states for each of the following steps $t \in \{2, \dots, T\}$ are generated from a multinomial regression with vector parameters $\mat{w}_k$, one set per possible hidden state $k \in \{1, \dots, K\}$, and covariates $\mat{u}_t$. The hidden states are subsequently sampled based on these transition probabilities.
 
@@ -934,7 +932,7 @@ fit <- iohmm_fit(K, dataset$u, dataset$y)
 
 We rely on several diagnostic statistics and plots provided by rstan [@sdt2017rstan] and shinystan [@sdt2017shinystan] to assess mixing, convergence and the absence of divergences. Label switching hinders the comparison between true and observed parameters.
 
-```{r iohmm_walkthrough_summary, echo = TRUE, eval = TRUE}
+```{r iohmm_walkthrough_summary, echo = FALSE, eval = TRUE}
 knitr::kable(cbind(
              unlist(list(dataset$theta$pi1, 
                         t(dataset$theta$w), 
@@ -973,7 +971,7 @@ table(new = dataset$zrelab, original = dataset$z)
 
 The confusion matrix makes evident that, under ideal conditions, the sampler works as intended.
 
-```{r iohmm_walkthrough_filtered, echo = TRUE, eval = TRUE}
+```{r iohmm_walkthrough_filtered, echo = FALSE, eval = TRUE}
 knitr::kable(table(
         estimated = apply(round(apply(alpha, c(2, 3),
                                       function(x) {
@@ -1129,10 +1127,13 @@ devtools::session_info("rstan")
 
 ---
 
+[^discrete]: Both the discrete-time and discrete-state assumptions can be relaxed, though we
+do not pursue that direction in this paper.
+
 [^bold_outputs]: The output can be univariate or multivariate depending on the choice of model specification, in which case an observation at a given time index $t$ is a scalar $y_t$ or a vector $\mat{y}_t$ respectively. Although we introduce definitions and properties along an example based on a univariate series, we keep the bold notation to remind that the equations are valid in a multivariate context as well.
 
 [^regimes]: This time window is not the best illustration of this model because
 the U.S. was in the middle of an extended post-crisis recovery. Still, we 
 do see that the model correctly identifies a number of short-term reversals
-over this period. 
+over this period.
 
