@@ -13,10 +13,14 @@
   publisher = {Institute of Mathematical Statistics},
 }
 
-@Misc{dempster1977maximum,
+@Article{dempster1977maximum,
   author = {Dempster, A. P. and Laird, N. M. and Rubin, D. B.},
   title  = {Maximum likelihood from incomplete data via the EM algorithm},
   year   = {1977},
+  journal = "Journal of the Royal Statistical Society: Series B (Methodological)",
+  volume = 39,
+  number = 1,
+  pages = {1--38}
 }
 
 @Misc{mackay1997ensemble,
@@ -58,7 +62,7 @@
   author    = {Jordan, Michael I},
   title     = {An introduction to probabilistic graphical models},
   year      = {2003},
-  publisher = {preparation},
+  publisher = {In Preparation},
 }
 
 @Article{viterbi1967error,
@@ -106,11 +110,13 @@
   pages   = {1--8},
 }
 
-@Misc{bengio1995input,
-  author   = {Bengio, Yoshua and Frasconi, Paolo},
-  title    = {An Input Output HMM Architecture},
-  year     = {1995},
-  abstract = {We introduce a recurrent architecture having a modular structure  and we formulate a training procedure based on the EM algorithm.  The resulting model has similarities to hidden Markov models, but  supports recurrent networks processing style and allows to exploit  the supervised learning paradigm while using maximum likelihood estimation.},
+@INPROCEEDINGS{bengio1994input,
+AUTHOR={Bengio, Yoshua and Frasconi, Paolo},
+TITLE={An Input Output HMM Architecture},
+YEAR={1994},
+PAGES={427-434},
+BOOKTITLE="Proceedings of the 7th International Conference on Neural Information Processing Systems ({NIPS} 1994)",
+VENUE={Denver, Colorado}
 }
 
 @Book{doob1953stochastic,
@@ -167,7 +173,7 @@
   title   = {Identifying Bayesian Mixture Models},
   journal = {Stan Case Studies},
   year    = {2017},
-  issue   = {Volume 4},
+  volume   = {4},
   url     = {http://mc-stan.org/users/documentation/case-studies/identifying_mixture_models.html},
 }
 
@@ -176,24 +182,30 @@
   title    = {Stan Modeling Language: User’s Guide and Reference Manual},
   year     = {2017},
   date     = {2017-04-14},
-  subtitle = {Version 2.15.0.},
+  subtitle = {Version 2.17.0.},
 }
 
 @Article{gelman1992inference,
   author    = {Gelman, Andrew and Rubin, Donald B},
   title     = {Inference from iterative simulation using multiple sequences},
-  journal   = {Statistical science},
+  journal   = {Statistical Science},
   year      = {1992},
   pages     = {457--472},
-  publisher = {JSTOR},
+  volume = 7,
+  number = 4,
+  doi = "10.1214/ss/1177011136"
 }
 
-@Article{gelman2011inference,
+@incollection{gelman2011inference,
   author  = {Gelman, Andrew and Shirley, Kenneth and others},
   title   = {Inference from simulations and monitoring convergence},
-  journal = {Handbook of markov chain monte carlo},
+  booktitle = {Handbook of Markov Chain Monte Carlo},
   year    = {2011},
   pages   = {163--174},
+  chapter = 6,
+  editor  = {Steve Brooks and Andrew Gelman and Galin L. Jones and Xiao-Li Meng},
+  publisher = "CRC Press",
+  series = "Chapman \& Hall/CRC Handbooks of Modern Statistical Methods"
 }
 
 @Article{cook2006validation,
@@ -205,6 +217,7 @@
   number    = {3},
   pages     = {675--692},
   publisher = {Taylor \& Francis},
+  doi = "10.1198/106186006X136976"
 }
 
 @Misc{sdt2017shinystan,
@@ -399,12 +412,11 @@
 @Article{baum1966statistical,
   author    = {Baum, Leonard E and Petrie, Ted},
   title     = {Statistical inference for probabilistic functions of finite state Markov chains},
-  journal   = {The annals of mathematical statistics},
+  journal   = {The Annals of Mathematical Statistics},
   year      = {1966},
   volume    = {37},
   number    = {6},
-  pages     = {1554--1563},
-  publisher = {JSTOR},
+  pages     = {1554--1563}
 }
 
 @Article{baum1968growth,
@@ -420,9 +432,9 @@
 
 @Book{casella2002statistical,
   author    = {Casella, George and Berger, Roger L},
-  title     = {Statistical inference},
+  title     = {Statistical Inference},
   year      = {2002},
-  volume    = {2},
+  edition    = {2},
   publisher = {Duxbury Pacific Grove, CA},
 }
 
@@ -441,12 +453,13 @@
 @Article{jelinek1976continuous,
   author        = {Jelinek, Frederick},
   title         = {Continuous speech recognition by statistical methods},
-  journal       = {Proceedings of the IEEE},
+  journal       = {Proceedings of the {IEEE}},
   year          = {1976},
   volume        = {64},
   number        = {4},
   pages         = {532--556},
   __markedentry = {[Bebop:6]},
+  doi           = "10.1109/PROC.1976.10159",
   publisher     = {IEEE},
 }
 

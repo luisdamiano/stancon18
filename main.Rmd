@@ -52,7 +52,7 @@ cat("
 ")
 ```
 
-This case study documents the implementation in [Stan](http://mc-stan.org/) [@carpenter2017stan] of the Hidden Markov Model (HMM) for unsupervised learning [@baum1966statistical; @baum1967inequality; @baum1968growth; @baum1970maximization; @baum1972inequality]. Additionally, we present the adaptations needed for the Input-Output Hidden Markov Model (IOHMM). IOHMM is an architecture proposed by @bengio1995input to map input sequences, sometimes called the control signal, to output sequences. Compared to HMM, it aims at being especially effective at learning long term memory, that is when input-output sequences span long points. In all cases, we provide a fully Bayesian estimation of the model parameters and inference on hidden quantities, namely filtered and smoothed posterior distribution of the hidden states, and jointly most probable state path.
+This case study documents the implementation in [Stan](http://mc-stan.org/) [@carpenter2017stan] of the Hidden Markov Model (HMM) for unsupervised learning [@baum1966statistical; @baum1967inequality; @baum1968growth; @baum1970maximization; @baum1972inequality]. Additionally, we present the adaptations needed for the Input-Output Hidden Markov Model (IOHMM). IOHMM is an architecture proposed by @bengio1994input to map input sequences, sometimes called the control signal, to output sequences. Compared to HMM, it aims at being especially effective at learning long term memory, that is when input-output sequences span long points. In all cases, we provide a fully Bayesian estimation of the model parameters and inference on hidden quantities, namely filtered and smoothed posterior distribution of the hidden states, and jointly most probable state path.
 
 _A Tutorial on Hidden Markov Models using Stan_ is distributed under the [Creative Commons Attribution 4.0 International Public License](cc-by-v4.0.md). Accompanying code is distributed under the [GNU General Public License v3.0](gnu-gpl-v3.0.md). See the [README](README.md) file for details. All files are available in the [stancon18](https://github.com/luisdamiano/stancon18) GitHub repository.
 
@@ -305,7 +305,7 @@ The Stan code makes evident that the time complexity of the algorithm is $O(K^2T
 
 The implementation is representative of the matrix notation in @murphy2012machine [eq. 17.48]. The `accumulator` variable carries the element-wise operations for all possible previous states which are later combined as indicated by the matrix multiplication. 
 
-Since log domain should be preferred to avoid numerical underflow, multiplications are translated into sums of logs. Furthermore, we use Stan's implementation of the linear sums on the log scale to prevent underflow and overflow in the exponentiation [@team2017stan, p. 141]. In consequence, `logalpha` represents the forward quantity in log scale and needs to be exponentially normalized for interpretability.
+Since log domain should be preferred to avoid numerical underflow, multiplications are translated into sums of logs. Furthermore, we use Stan's implementation of the linear sums on the log scale to prevent underflow and overflow in the exponentiation [@team2017stan, p. 192]. In consequence, `logalpha` represents the forward quantity in log scale and needs to be exponentially normalized for interpretability.
 
 ```{stan stan_forward_norm, echo = TRUE, eval = FALSE, output.var = "TRASH"}
 generated quantities {
@@ -648,7 +648,7 @@ plot_outputvit(x = dataset$y,
 
 # The Input-Output Hidden Markov Model
 
-The IOHMM is an architecture proposed by @bengio1995input to map input sequences, sometimes called the control signal, to output sequences. It is a probabilistic framework that can deal with general sequence processing tasks such as production, classification and prediction. The main difference with Hidden Markov Models (HMM), which are part of the unsupervised learning paradigm, is the capability to learn the output sequence itself instead of the distribution of the output sequence.
+The IOHMM is an architecture proposed by @bengio1994input to map input sequences, sometimes called the control signal, to output sequences. It is a probabilistic framework that can deal with general sequence processing tasks such as production, classification and prediction. The main difference with Hidden Markov Models (HMM), which are part of the unsupervised learning paradigm, is the capability to learn the output sequence itself instead of the distribution of the output sequence.
 
 ## Definitions
 
@@ -807,12 +807,14 @@ The Stan code for the Viterbi decoding algorithm need no further modification.
 
 The parameters of the models are $\mat{\theta} = (\mat{\pi}_1, \mat{\theta}_h, \mat{\theta}_o)$, where $\mat{\pi}_1$ is the initial state distribution, $\mat{\theta}_h$ are the parameters of the hidden model and $\mat{\theta}_o$ are the parameters of the state-conditional density function $p(\mat{y}_t | z_t = j, \mat{u}_t)$. State transition is characterized by a multinomial regression with parameters $\mat{w}_k$ for $k \in \{1, \dots, K\}$, while emissions are modeled by a linear regression with Gaussian error and parameters $\mat{b}_k$ and $\mat{\Sigma}_k$ for $k \in \{1, \dots, K\}$.
 
-Estimation can be run under both the maximum likelihood and Bayesian frameworks. Although it is a straightforward procedure when the data is fully observed, in practice the latent states $\mat{z}_{1:T}$ are hidden. The most common approach is the application of the EM algorithm to find either the maximum likelihood or the maximum a posteriori estimates. @bengio1995input proposes a straightforward modification of the EM algorithm. The application of sigmoidal functions, for example the logistic or softmax transforms for the hidden transition model, requires numeric optimization via gradient ascent or similar methods for the M step. In this work, we exploit Stan's capabilities to produce a sampler that explores the posterior density of the model parameters.
+Estimation can be run under both the maximum likelihood and Bayesian frameworks. Although it is a straightforward procedure when the data is fully observed, in practice the latent states $\mat{z}_{1:T}$ are hidden. The most common approach is the application of the EM algorithm to find either the maximum likelihood or the maximum a posteriori estimates. @bengio1994input proposes a straightforward modification of the EM algorithm. The application of sigmoidal functions, for example the logistic or softmax transforms for the hidden transition model, requires numeric optimization via gradient ascent or similar methods for the M step. In this work, we exploit Stan's capabilities to produce a sampler that explores the posterior density of the model parameters.
 
 ## A walk-though
 
 ### Numerical stability for the softmax function
-A digression! The softmax function, or normalized exponential function, can suffer from over or underflow in the exponentials. A naive implementation may fail:
+Before we begin, we pause for a minor digression on numerical stability. 
+
+The softmax function, or normalized exponential function, can suffer from over or underflow in the exponentials. A naive implementation may fail:
 
 ```{r softmax_naive, echo = TRUE}
 x <- 10^(1:5)
@@ -834,7 +836,7 @@ softmax <- function(x) {
 softmax(x)
 ```
 
-This is already taken care in Stan [@team2017stan, p. 474].
+This is already taken care in Stan [@team2017stan, p. 478].
 
 ### Back to the walk-though 
 
@@ -1005,7 +1007,10 @@ We acknowledge the Google Summer Of Code (GSOC) program for funding. This tutori
 # Original Computing Environment
 
 ```{r computing_environment, echo = FALSE}
-writeLines(readLines(file.path(Sys.getenv("HOME"), ".R/Makevars")))
+makevars_file <- file.path(Sys.getenv("HOME"), ".R/Makevars")
+if(file.exists(makevars_file)) {
+    writeLines(readLines(makevars_file))
+}
 devtools::session_info("rstan")
 ```
 
