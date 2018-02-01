@@ -33,7 +33,6 @@ transformed parameters {
   A[2, 1] = 1 - p_remain[2];
   A[2, 2] = p_remain[2];
 
-
   // GARCH Component
   // ------------------
 
@@ -80,6 +79,7 @@ transformed parameters {
     }
   }
 }
+
 model {
   // Priors
 
